@@ -19,6 +19,8 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 public unsafe class DracoMeshLoader
 {
@@ -241,46 +243,32 @@ public unsafe class DracoMeshLoader
 		Color[] newColors = new Color[0];
 		if (tmpMesh->hasColor)
 			newColors = new Color[tmpMesh->numVertices];
-		int byteStridePerValue = 4;
 
 		byte* posaddr = (byte*)tmpMesh->position;
 		byte* normaladdr = (byte*)tmpMesh->normal;
 		byte* coloraddr = (byte*)tmpMesh->color;
 		byte* uvaddr = (byte*)tmpMesh->texcoord;
-		for (int i = 0; i < tmpMesh->numVertices; ++i)
+
+		/// TODO(atteneder): check if we can avoid mem copies with new Mesh API (2019.3?)
+		/// by converting void* to NativeArray via
+		/// NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray
+		var newVerticesPtr = UnsafeUtility.AddressOf(ref newVertices[0]);
+		UnsafeUtility.MemCpy(newVerticesPtr,posaddr,tmpMesh->numVertices * 12 );
+
+		if (tmpMesh->hasNormal) {
+			var newNormalsPtr = UnsafeUtility.AddressOf(ref newNormals[0]);
+			UnsafeUtility.MemCpy(newNormalsPtr,normaladdr,tmpMesh->numVertices * 12 );
+		}
+
+		if (tmpMesh->hasColor) {
+			var newColorsPtr = UnsafeUtility.AddressOf(ref newColors[0]);
+			UnsafeUtility.MemCpy(newColorsPtr,coloraddr,tmpMesh->numVertices * 16 );
+		}
+
+		if (tmpMesh->hasTexcoord)
 		{
-			int numValuePerVertex = 3;
-			for (int j = 0; j < numValuePerVertex; ++j)
-			{
-				int byteStridePerVertex = byteStridePerValue * numValuePerVertex;
-				int OffSet = i * byteStridePerVertex + byteStridePerValue * j;
-
-				newVertices[i][j] = *((float*)(posaddr + OffSet));
-				if (tmpMesh->hasNormal)
-				{
-					newNormals[i][j] = *((float*)(normaladdr + OffSet));
-				}
-			}
-
-			if (tmpMesh->hasColor)
-			{
-				numValuePerVertex = 4;
-				for (int j = 0; j < numValuePerVertex; ++j)
-				{
-					int byteStridePerVertex = byteStridePerValue * numValuePerVertex;
-					newColors[i][j] = *((float*)(coloraddr + (i * byteStridePerVertex + byteStridePerValue * j)));
-				}
-			}
-
-			if (tmpMesh->hasTexcoord)
-			{
-				numValuePerVertex = 2;
-				for (int j = 0; j < numValuePerVertex; ++j)
-				{
-					int byteStridePerVertex = byteStridePerValue * numValuePerVertex;
-					newUVs[i][j] = *((float*)(uvaddr + (i * byteStridePerVertex + byteStridePerValue * j)));
-				}
-			}
+			var newUVsPtr = UnsafeUtility.AddressOf(ref newUVs[0]);
+			UnsafeUtility.MemCpy(newUVsPtr,uvaddr,tmpMesh->numVertices * 8 );
 		}
 
 		ReleaseUnityMesh (&tmpMesh);
