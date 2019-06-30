@@ -1,0 +1,7 @@
+# Denote all files that are truly binary and should not be modified.
+*.drc binary filter=lfs diff=lfs merge=lfs
+
+*.so binary filter=lfs diff=lfs merge=lfs
+*.a binary filter=lfs diff=lfs merge=lfs
+*.bundle binary filter=lfs diff=lfs merge=lfs
+*.dll binary filter=lfs diff=lfs merge=lfs
