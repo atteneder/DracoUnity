@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
+// #define DRACO_VERBOSE
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -191,7 +194,7 @@ public unsafe class DracoMeshLoader
 			return -1;
 		}
 		byte[] encodedData = asset.bytes;
-		Debug.Log (encodedData.Length.ToString ());
+		Log (encodedData.Length.ToString ());
 		if (encodedData.Length == 0) {
 			Debug.LogError ("Didn't load encoded data!");
 			return -1;
@@ -207,14 +210,14 @@ public unsafe class DracoMeshLoader
 			return -1;
 		}
 
-		Debug.Log ("Num indices: " + tmpMesh->numFaces.ToString ());
-		Debug.Log ("Num vertices: " + tmpMesh->numVertices.ToString ());
+		Log ("Num indices: " + tmpMesh->numFaces.ToString ());
+		Log ("Num vertices: " + tmpMesh->numVertices.ToString ());
 		if (tmpMesh->hasNormal)
-			Debug.Log ("Decoded mesh normals.");
+			Log ("Decoded mesh normals.");
 		if (tmpMesh->hasTexcoord)
-			Debug.Log ("Decoded mesh texcoords.");
+			Log ("Decoded mesh texcoords.");
 		if (tmpMesh->hasColor)
-			Debug.Log ("Decoded mesh colors.");
+			Log ("Decoded mesh colors.");
 
 		int numFaces = tmpMesh->numFaces;
 		int[] newTriangles = new int[tmpMesh->numFaces * 3];
@@ -312,7 +315,7 @@ public unsafe class DracoMeshLoader
 				if (splittedMeshes [i].normals != null) {
 					mesh.normals = splittedMeshes [i].normals;
 				} else {
-					Debug.Log ("Sub mesh doesn't have normals, recomputed.");
+					Log ("Sub mesh doesn't have normals, recomputed.");
 					mesh.RecalculateNormals ();
 				}
 				mesh.RecalculateBounds ();
@@ -328,7 +331,7 @@ public unsafe class DracoMeshLoader
 				mesh.normals = newNormals;
 			} else {
 				mesh.RecalculateNormals ();
-				Debug.Log ("Mesh doesn't have normals, recomputed.");
+				Log ("Mesh doesn't have normals, recomputed.");
 			}
 			if (newColors.Length != 0) {
 				mesh.colors = newColors;
@@ -368,5 +371,10 @@ public unsafe class DracoMeshLoader
 		}
 
 		return numFaces;
+	}
+
+	[System.Diagnostics.Conditional("DRACO_VERBOSE")]
+	static void Log(string format, params object[] args) {
+		Debug.LogFormat(format,args);
 	}
 }
