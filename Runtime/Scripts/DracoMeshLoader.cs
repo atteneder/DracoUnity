@@ -13,7 +13,6 @@
 // limitations under the License.
 //
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -188,13 +187,13 @@ public unsafe class DracoMeshLoader
 	{
 		TextAsset asset = Resources.Load (assetName, typeof(TextAsset)) as TextAsset;
 		if (asset == null) {
-			Debug.Log ("Didn't load file!");
+			Debug.LogError ("Didn't load file!");
 			return -1;
 		}
 		byte[] encodedData = asset.bytes;
 		Debug.Log (encodedData.Length.ToString ());
 		if (encodedData.Length == 0) {
-			Debug.Log ("Didn't load encoded data!");
+			Debug.LogError ("Didn't load encoded data!");
 			return -1;
 		}
 		return DecodeMesh (encodedData, ref meshes);
@@ -204,7 +203,7 @@ public unsafe class DracoMeshLoader
 	{
 		DracoToUnityMesh* tmpMesh;
 		if (DecodeMeshForUnity (data, data.Length, &tmpMesh) <= 0) {
-			Debug.Log ("Failed: Decoding error.");
+			Debug.LogError ("Failed: Decoding error.");
 			return -1;
 		}
 
