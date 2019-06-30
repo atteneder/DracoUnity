@@ -16,11 +16,14 @@
 // #define DRACO_VERBOSE
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Events;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 
 public unsafe class DracoMeshLoader
 {
@@ -48,8 +51,24 @@ public unsafe class DracoMeshLoader
 		public Color[] colors;
 	}
 
+	struct DracoJob : IJob {
+
+		[ReadOnly]
+		public NativeArray<byte> data;
+
+		public NativeArray<IntPtr> outMesh;
+
+		public NativeArray<int> result;
+
+		public void Execute() {
+			DracoToUnityMesh* tmpMesh;
+			result[0] = DecodeMeshForUnity (data.GetUnsafeReadOnlyPtr(), data.Length, &tmpMesh);
+			outMesh[0] = (IntPtr) tmpMesh;
+		}
+	}
+
 	[DllImport ("dracodec_unity")] private static extern int DecodeMeshForUnity (
-		byte[] buffer, int length, DracoToUnityMesh**tmpMesh);
+		void* buffer, int length, DracoToUnityMesh**tmpMesh);
 
 	[DllImport("dracodec_unity")] private static extern int ReleaseUnityMesh(DracoToUnityMesh** tmpMesh);
 
@@ -187,6 +206,8 @@ public unsafe class DracoMeshLoader
 		return BitConverter.ToSingle (byteArray, 0);
 	}
 
+/*
+	// TODO(atteneder): bring it back for editor import
 	// TODO(zhafang): Add back LoadFromURL.
 	public int LoadMeshFromAsset (string assetName, ref List<Mesh> meshes)
 	{
@@ -203,14 +224,47 @@ public unsafe class DracoMeshLoader
 		}
 		return DecodeMesh (encodedData, ref meshes);
 	}
+//*/
 
-	public unsafe int DecodeMesh (byte[] data, ref List<Mesh> meshes)
-	{
-		DracoToUnityMesh* tmpMesh;
-		if (DecodeMeshForUnity (data, data.Length, &tmpMesh) <= 0) {
-			Debug.LogError ("Failed: Decoding error.");
-			return -1;
+	public UnityAction<List<Mesh>> onMeshesLoaded;
+
+	public IEnumerator DecodeMesh(NativeArray<byte> data) {
+
+		var job = new DracoJob();
+
+		job.data = data;
+		job.result = new NativeArray<int>(1,Allocator.TempJob);
+		job.outMesh = new NativeArray<IntPtr>(1,Allocator.TempJob);
+
+		var jobHandle = job.Schedule();
+
+		while(!jobHandle.IsCompleted) {
+			yield return null;
 		}
+		jobHandle.Complete();
+
+		int result = job.result[0];
+		IntPtr dracoMesh = job.outMesh[0];
+
+		job.result.Dispose();
+		job.outMesh.Dispose();
+
+		if (result <= 0) {
+			Debug.LogError ("Failed: Decoding error.");
+			yield break;
+		}
+
+		var meshes = new List<Mesh>();
+		CreateMesh(dracoMesh,ref meshes);
+
+		if(onMeshesLoaded!=null) {
+			onMeshesLoaded(meshes);
+		}
+	}
+
+	unsafe int CreateMesh (IntPtr dracoMesh, ref List<Mesh> meshes)
+	{
+		DracoToUnityMesh* tmpMesh = (DracoToUnityMesh*) dracoMesh;
 
 		Log ("Num indices: " + tmpMesh->numFaces.ToString ());
 		Log ("Num vertices: " + tmpMesh->numVertices.ToString ());
