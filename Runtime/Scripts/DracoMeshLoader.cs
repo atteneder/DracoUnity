@@ -72,131 +72,6 @@ public unsafe class DracoMeshLoader
 
 	[DllImport("dracodec_unity")] private static extern int ReleaseUnityMesh(DracoToUnityMesh** tmpMesh);
 
-	static private int maxNumVerticesPerMesh = 60000;
-
-	// Unity only support maximum 65534 vertices per mesh. So large meshes need
-	// to be splitted.
-	private void SplitMesh (DecodedMesh mesh, ref List<DecodedMesh> splittedMeshes)
-	{
-		// Map between new indices on a splitted mesh and old indices on the
-		// original mesh.
-		int[] newToOldIndexMap = new int[maxNumVerticesPerMesh];
-
-		// Index of the first unprocessed corner.
-		int baseCorner = 0;
-		int indicesCount = mesh.indices.Length;
-
-		// Map between old indices of the original mesh and indices on the currently
-		// processed sub-mesh. Inverse of |newToOldIndexMap|.
-		int[] oldToNewIndexMap = new int[indicesCount];
-		int[] newIndices = new int[indicesCount];
-
-
-		// Set mapping between existing vertex indices and new vertex indices to
-		// a default value.
-		for (int i = 0; i < indicesCount; i++)
-		{
-			oldToNewIndexMap[i] = -1;
-		}
-
-		// Number of added vertices for the currently processed sub-mesh.
-		int numAddedVertices = 0;
-
-		// Process all corners (faces) of the original mesh.
-		while (baseCorner < indicesCount)
-		{
-			// Reset the old to new indices map that may have been set by previously
-			// processed sub-meshes.
-			for (int i = 0; i < numAddedVertices; i++)
-			{
-				oldToNewIndexMap[newToOldIndexMap[i]] = -1;
-			}
-			numAddedVertices = 0;
-
-			// Number of processed corners on the current sub-mesh.
-			int numProcessedCorners = 0;
-
-			// Local storage for indices added to the new sub-mesh for a currently
-			// processed face.
-			int[] newlyAddedIndices = new int[3];
-
-			// Sub-mesh processing starts here.
-			for (; baseCorner + numProcessedCorners < indicesCount;)
-			{
-				// Number of vertices that we need to add to the current sub-mesh.
-				int verticesAdded = 0;
-				for (int i = 0; i < 3; i++)
-				{
-					if (oldToNewIndexMap[mesh.indices[baseCorner + numProcessedCorners + i]] == -1)
-					{
-						newlyAddedIndices[verticesAdded] = mesh.indices[baseCorner + numProcessedCorners + i];
-						verticesAdded++;
-					}
-				}
-
-				// If the number of new vertices that we need to add is larger than the
-				// allowed limit, we need to stop processing the current sub-mesh.
-				// The current face will be processed again for the next sub-mesh.
-				if (numAddedVertices + verticesAdded > maxNumVerticesPerMesh)
-				{
-					break;
-				}
-
-				// Update mapping between old an new vertex indices.
-				for (int i = 0; i < verticesAdded; i++)
-				{
-					oldToNewIndexMap[newlyAddedIndices[i]] = numAddedVertices;
-					newToOldIndexMap[numAddedVertices] = newlyAddedIndices[i];
-					numAddedVertices++;
-				}
-
-				for (int i = 0; i < 3; i++)
-				{
-					newIndices[numProcessedCorners] = oldToNewIndexMap[mesh.indices[baseCorner + numProcessedCorners]];
-					numProcessedCorners++;
-				}
-			}
-			// Sub-mesh processing done.
-			DecodedMesh subMesh = new DecodedMesh();
-			subMesh.indices = new int[numProcessedCorners];
-			Array.Copy(newIndices, subMesh.indices, numProcessedCorners);
-			subMesh.vertices = new Vector3[numAddedVertices];
-			for (int i = 0; i < numAddedVertices; i++)
-			{
-				subMesh.vertices[i] = mesh.vertices[newToOldIndexMap[i]];
-			}
-			if (mesh.normals != null)
-			{
-				subMesh.normals = new Vector3[numAddedVertices];
-				for (int i = 0; i < numAddedVertices; i++)
-				{
-					subMesh.normals[i] = mesh.normals[newToOldIndexMap[i]];
-				}
-			}
-
-			if (mesh.colors != null)
-			{
-				subMesh.colors = new Color[numAddedVertices];
-				for (int i = 0; i < numAddedVertices; i++)
-				{
-					subMesh.colors[i] = mesh.colors[newToOldIndexMap[i]];
-				}
-			}
-
-			if (mesh.uvs != null)
-			{
-				subMesh.uvs = new Vector2[numAddedVertices];
-				for (int i = 0; i < numAddedVertices; i++)
-				{
-					subMesh.uvs[i] = mesh.uvs[newToOldIndexMap[i]];
-				}
-			}
-
-			splittedMeshes.Add(subMesh);
-			baseCorner += numProcessedCorners;
-		}
-	}
-
 	private float ReadFloatFromIntPtr (IntPtr data, int offset)
 	{
 		byte[] byteArray = new byte[4];
@@ -327,90 +202,62 @@ public unsafe class DracoMeshLoader
 
 		ReleaseUnityMesh (&tmpMesh);
 
-		if (newVertices.Length > maxNumVerticesPerMesh) {
-			// Unity only support maximum 65534 vertices per mesh. So large meshes
-			// need to be splitted.
-
-			DecodedMesh decodedMesh = new DecodedMesh ();
-			decodedMesh.vertices = newVertices;
-			decodedMesh.indices = newTriangles;
-			if (newUVs.Length != 0)
-				decodedMesh.uvs = newUVs;
-			if (newNormals.Length != 0)
-				decodedMesh.normals = newNormals;
-			if (newColors.Length != 0)
-				decodedMesh.colors = newColors;
-			List<DecodedMesh> splittedMeshes = new List<DecodedMesh> ();
-
-			SplitMesh (decodedMesh, ref splittedMeshes);
-			for (int i = 0; i < splittedMeshes.Count; ++i) {
-				Mesh mesh = new Mesh ();
-				mesh.vertices = splittedMeshes [i].vertices;
-				mesh.triangles = splittedMeshes [i].indices;
-				if (splittedMeshes [i].uvs != null)
-					mesh.uv = splittedMeshes [i].uvs;
-
-				if (splittedMeshes [i].colors != null) {
-					mesh.colors = splittedMeshes[i].colors;
-				}
-
-				if (splittedMeshes [i].normals != null) {
-					mesh.normals = splittedMeshes [i].normals;
-				} else {
-					Log ("Sub mesh doesn't have normals, recomputed.");
-					mesh.RecalculateNormals ();
-				}
-				mesh.RecalculateBounds ();
-				meshes.Add (mesh);
-			}
-		} else {
-			Mesh mesh = new Mesh ();
-			mesh.vertices = newVertices;
-			mesh.triangles = newTriangles;
-			if (newUVs.Length != 0)
-				mesh.uv = newUVs;
-			if (newNormals.Length != 0) {
-				mesh.normals = newNormals;
-			} else {
-				mesh.RecalculateNormals ();
-				Log ("Mesh doesn't have normals, recomputed.");
-			}
-			if (newColors.Length != 0) {
-				mesh.colors = newColors;
-			}
-
-			// Scale and translate the decoded mesh so it would be visible to
-			// a new camera's default settings.
-			float scale = 0.5f / mesh.bounds.extents.x;
-			if (0.5f / mesh.bounds.extents.y < scale)
-				scale = 0.5f / mesh.bounds.extents.y;
-			if (0.5f / mesh.bounds.extents.z < scale)
-				scale = 0.5f / mesh.bounds.extents.z;
-
-			Vector3[] vertices = mesh.vertices;
-			int i = 0;
-			while (i < vertices.Length) {
-				vertices[i] *= scale;
-				i++;
-			}
-
-			mesh.vertices = vertices;
-			mesh.RecalculateBounds ();
-
-			Vector3 translate = mesh.bounds.center;
-			translate.x = 0 - mesh.bounds.center.x;
-			translate.y = 0 - mesh.bounds.center.y;
-			translate.z = 2 - mesh.bounds.center.z;
-
-			i = 0;
-			while (i < vertices.Length) {
-				vertices[i] += translate;
-				i++;
-			}
-			mesh.vertices = vertices;
-			mesh.RecalculateBounds ();
-			meshes.Add (mesh);
+		Mesh mesh = new Mesh ();
+#if UNITY_2017_3_OR_NEWER
+		mesh.indexFormat =  (newVertices.Length > System.UInt16.MaxValue)
+		? UnityEngine.Rendering.IndexFormat.UInt32
+		: UnityEngine.Rendering.IndexFormat.UInt16;
+#else
+		if(newVertices.Length > System.UInt16.MaxValue) {
+			throw new System.Exception("Draco meshes with more than 65535 vertices are only supported from Unity 2017.3 onwards.");
 		}
+#endif
+
+		mesh.vertices = newVertices;
+		mesh.triangles = newTriangles;
+		if (newUVs.Length != 0)
+			mesh.uv = newUVs;
+		if (newNormals.Length != 0) {
+			mesh.normals = newNormals;
+		} else {
+			mesh.RecalculateNormals ();
+			Log ("Mesh doesn't have normals, recomputed.");
+		}
+		if (newColors.Length != 0) {
+			mesh.colors = newColors;
+		}
+
+		// Scale and translate the decoded mesh so it would be visible to
+		// a new camera's default settings.
+		float scale = 0.5f / mesh.bounds.extents.x;
+		if (0.5f / mesh.bounds.extents.y < scale)
+			scale = 0.5f / mesh.bounds.extents.y;
+		if (0.5f / mesh.bounds.extents.z < scale)
+			scale = 0.5f / mesh.bounds.extents.z;
+
+		Vector3[] vertices = mesh.vertices;
+		int vi = 0;
+		while (vi < vertices.Length) {
+			vertices[vi] *= scale;
+			vi++;
+		}
+
+		mesh.vertices = vertices;
+		mesh.RecalculateBounds ();
+
+		Vector3 translate = mesh.bounds.center;
+		translate.x = 0 - mesh.bounds.center.x;
+		translate.y = 0 - mesh.bounds.center.y;
+		translate.z = 2 - mesh.bounds.center.z;
+
+		vi = 0;
+		while (vi < vertices.Length) {
+			vertices[vi] += translate;
+			vi++;
+		}
+		mesh.vertices = vertices;
+		mesh.RecalculateBounds ();
+		meshes.Add (mesh);
 
 		return numFaces;
 	}
