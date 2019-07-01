@@ -74,26 +74,6 @@ public unsafe class DracoMeshLoader
 		return BitConverter.ToSingle (byteArray, 0);
 	}
 
-/*
-	// TODO(atteneder): bring it back for editor import
-	// TODO(zhafang): Add back LoadFromURL.
-	public int LoadMeshFromAsset (string assetName, ref List<Mesh> meshes)
-	{
-		TextAsset asset = Resources.Load (assetName, typeof(TextAsset)) as TextAsset;
-		if (asset == null) {
-			Debug.LogError ("Didn't load file!");
-			return -1;
-		}
-		byte[] encodedData = asset.bytes;
-		Log (encodedData.Length.ToString ());
-		if (encodedData.Length == 0) {
-			Debug.LogError ("Didn't load encoded data!");
-			return -1;
-		}
-		return DecodeMesh (encodedData, ref meshes);
-	}
-//*/
-
 	public UnityAction<Mesh> onMeshesLoaded;
 
 	public IEnumerator DecodeMesh(NativeArray<byte> data) {
@@ -130,6 +110,39 @@ public unsafe class DracoMeshLoader
 			onMeshesLoaded(mesh);
 		}
 	}
+
+#if UNITY_EDITOR
+	/// <summary>
+	/// Synchronous (non-threaded) version of DecodeMesh for Edtior purpose.
+	/// </summary>
+	/// <param name="data">Drace file data</param>
+	/// <returns>The Mesh</returns>
+	public Mesh DecodeMeshSync(NativeArray<byte> data) {
+
+		Profiler.BeginSample("JobPrepare");
+		var job = new DracoJob();
+
+		job.data = data;
+		job.result = new NativeArray<int>(1,defaultAllocator);
+		job.outMesh = new NativeArray<IntPtr>(1,defaultAllocator);
+
+		job.Run();
+		Profiler.EndSample();
+
+		int result = job.result[0];
+		IntPtr dracoMesh = job.outMesh[0];
+
+		job.result.Dispose();
+		job.outMesh.Dispose();
+
+		if (result <= 0) {
+			Debug.LogError ("Failed: Decoding error.");
+			return null;
+		}
+
+		return CreateMesh(dracoMesh);
+	}
+#endif
 
 	unsafe Mesh CreateMesh (IntPtr dracoMesh)
 	{
