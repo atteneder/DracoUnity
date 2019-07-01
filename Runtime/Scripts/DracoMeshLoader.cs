@@ -17,9 +17,9 @@
 
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Profiling;
 using UnityEngine.Events;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -98,6 +98,7 @@ public unsafe class DracoMeshLoader
 
 	public IEnumerator DecodeMesh(NativeArray<byte> data) {
 
+		Profiler.BeginSample("JobPrepare");
 		var job = new DracoJob();
 
 		job.data = data;
@@ -105,6 +106,7 @@ public unsafe class DracoMeshLoader
 		job.outMesh = new NativeArray<IntPtr>(1,defaultAllocator);
 
 		var jobHandle = job.Schedule();
+		Profiler.EndSample();
 
 		while(!jobHandle.IsCompleted) {
 			yield return null;
@@ -131,69 +133,69 @@ public unsafe class DracoMeshLoader
 
 	unsafe Mesh CreateMesh (IntPtr dracoMesh)
 	{
+		Profiler.BeginSample("CreateMesh");
 		DracoToUnityMesh* tmpMesh = (DracoToUnityMesh*) dracoMesh;
 
 		Log ("Num indices: " + tmpMesh->numFaces.ToString ());
 		Log ("Num vertices: " + tmpMesh->numVertices.ToString ());
-		if (tmpMesh->hasNormal)
-			Log ("Decoded mesh normals.");
-		if (tmpMesh->hasTexcoord)
-			Log ("Decoded mesh texcoords.");
-		if (tmpMesh->hasColor)
-			Log ("Decoded mesh colors.");
 
-		int numFaces = tmpMesh->numFaces;
+		Profiler.BeginSample("CreateMeshAlloc");
 		int[] newTriangles = new int[tmpMesh->numFaces * 3];
-		for (int i = 0; i < tmpMesh->numFaces; ++i) {
-			byte* addr = (byte*)tmpMesh->indices + i * 3 * 4;
-			newTriangles[i * 3] = *((int*)addr);
-			newTriangles[i * 3 + 1] = *((int*)(addr + 4));
-			newTriangles[i * 3 + 2] = *((int*)(addr + 8));
-		}
-
-		// For floating point numbers, there's no Marshal functions could directly
-		// read from the unmanaged data.
-		// TODO(zhafang): Find better way to read float numbers.
 		Vector3[] newVertices = new Vector3[tmpMesh->numVertices];
-		Vector2[] newUVs = new Vector2[0];
-		if (tmpMesh->hasTexcoord)
-			newUVs = new Vector2[tmpMesh->numVertices];
-		Vector3[] newNormals = new Vector3[0];
-		if (tmpMesh->hasNormal)
-			newNormals = new Vector3[tmpMesh->numVertices];
-		Color[] newColors = new Color[0];
-		if (tmpMesh->hasColor)
-			newColors = new Color[tmpMesh->numVertices];
+		Profiler.EndSample();
 
+		Vector2[] newUVs = null;
+		Vector3[] newNormals = null;
+		Color[] newColors = null;
+
+		Profiler.BeginSample("CreateMeshIndices");
+		byte* indicesSrc = (byte*)tmpMesh->indices;
+		var indicesPtr = UnsafeUtility.AddressOf(ref newTriangles[0]);
+		UnsafeUtility.MemCpy(indicesPtr,indicesSrc,newTriangles.Length*4);
+		Profiler.EndSample();
+
+		Profiler.BeginSample("CreateMeshPositions");
 		byte* posaddr = (byte*)tmpMesh->position;
-		byte* normaladdr = (byte*)tmpMesh->normal;
-		byte* coloraddr = (byte*)tmpMesh->color;
-		byte* uvaddr = (byte*)tmpMesh->texcoord;
-
 		/// TODO(atteneder): check if we can avoid mem copies with new Mesh API (2019.3?)
 		/// by converting void* to NativeArray via
 		/// NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray
 		var newVerticesPtr = UnsafeUtility.AddressOf(ref newVertices[0]);
 		UnsafeUtility.MemCpy(newVerticesPtr,posaddr,tmpMesh->numVertices * 12 );
+		Profiler.EndSample();
 
-		if (tmpMesh->hasNormal) {
-			var newNormalsPtr = UnsafeUtility.AddressOf(ref newNormals[0]);
-			UnsafeUtility.MemCpy(newNormalsPtr,normaladdr,tmpMesh->numVertices * 12 );
-		}
-
-		if (tmpMesh->hasColor) {
-			var newColorsPtr = UnsafeUtility.AddressOf(ref newColors[0]);
-			UnsafeUtility.MemCpy(newColorsPtr,coloraddr,tmpMesh->numVertices * 16 );
-		}
-
-		if (tmpMesh->hasTexcoord)
-		{
+		if (tmpMesh->hasTexcoord) {
+			Profiler.BeginSample("CreateMeshUVs");
+			Log ("Decoded mesh texcoords.");
+			newUVs = new Vector2[tmpMesh->numVertices];
+			byte* uvaddr = (byte*)tmpMesh->texcoord;
 			var newUVsPtr = UnsafeUtility.AddressOf(ref newUVs[0]);
 			UnsafeUtility.MemCpy(newUVsPtr,uvaddr,tmpMesh->numVertices * 8 );
+			Profiler.EndSample();
+		}
+		if (tmpMesh->hasNormal) {
+			Profiler.BeginSample("CreateMeshNormals");
+			Log ("Decoded mesh normals.");
+			newNormals = new Vector3[tmpMesh->numVertices];
+			byte* normaladdr = (byte*)tmpMesh->normal;
+			var newNormalsPtr = UnsafeUtility.AddressOf(ref newNormals[0]);
+			UnsafeUtility.MemCpy(newNormalsPtr,normaladdr,tmpMesh->numVertices * 12 );
+			Profiler.EndSample();
+		}
+		if (tmpMesh->hasColor) {
+			Profiler.BeginSample("CreateMeshColors");
+			Log ("Decoded mesh colors.");
+			newColors = new Color[tmpMesh->numVertices];
+			byte* coloraddr = (byte*)tmpMesh->color;
+			var newColorsPtr = UnsafeUtility.AddressOf(ref newColors[0]);
+			UnsafeUtility.MemCpy(newColorsPtr,coloraddr,tmpMesh->numVertices * 16 );
+			Profiler.EndSample();
 		}
 
+		Profiler.BeginSample("CreateMeshRelease");
 		ReleaseUnityMesh (&tmpMesh);
+		Profiler.EndSample();
 
+		Profiler.BeginSample("CreateMeshFeeding");
 		Mesh mesh = new Mesh ();
 #if UNITY_2017_3_OR_NEWER
 		mesh.indexFormat =  (newVertices.Length > System.UInt16.MaxValue)
@@ -206,20 +208,21 @@ public unsafe class DracoMeshLoader
 #endif
 
 		mesh.vertices = newVertices;
-		mesh.triangles = newTriangles;
-		if (newUVs.Length != 0)
+		mesh.SetTriangles(newTriangles,0,true);
+		if (newUVs!=null) {
 			mesh.uv = newUVs;
-		if (newNormals.Length != 0) {
+		}
+		if (newNormals!=null) {
 			mesh.normals = newNormals;
 		} else {
 			mesh.RecalculateNormals ();
 			Log ("Mesh doesn't have normals, recomputed.");
 		}
-		if (newColors.Length != 0) {
+		if (newColors!=null) {
 			mesh.colors = newColors;
 		}
-		mesh.RecalculateBounds ();
 
+		Profiler.EndSample();
 		return mesh;
 	}
 
