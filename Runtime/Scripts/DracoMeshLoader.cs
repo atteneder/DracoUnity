@@ -27,6 +27,8 @@ using Unity.Jobs;
 
 public unsafe class DracoMeshLoader
 {
+	const Allocator defaultAllocator = Allocator.Persistent;
+
 	// Must stay the order to be consistent with C++ interface.
 	[StructLayout (LayoutKind.Sequential)] private struct DracoToUnityMesh
 	{
@@ -99,8 +101,8 @@ public unsafe class DracoMeshLoader
 		var job = new DracoJob();
 
 		job.data = data;
-		job.result = new NativeArray<int>(1,Allocator.TempJob);
-		job.outMesh = new NativeArray<IntPtr>(1,Allocator.TempJob);
+		job.result = new NativeArray<int>(1,defaultAllocator);
+		job.outMesh = new NativeArray<IntPtr>(1,defaultAllocator);
 
 		var jobHandle = job.Schedule();
 
