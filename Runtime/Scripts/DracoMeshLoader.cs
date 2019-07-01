@@ -42,15 +42,6 @@ public unsafe class DracoMeshLoader
 		public IntPtr color;
 	}
 
-	private struct DecodedMesh
-	{
-		public int[] indices;
-		public Vector3[] vertices;
-		public Vector3[] normals;
-		public Vector2[] uvs;
-		public Color[] colors;
-	}
-
 	struct DracoJob : IJob {
 
 		[ReadOnly]
@@ -226,36 +217,6 @@ public unsafe class DracoMeshLoader
 		if (newColors.Length != 0) {
 			mesh.colors = newColors;
 		}
-
-		// Scale and translate the decoded mesh so it would be visible to
-		// a new camera's default settings.
-		float scale = 0.5f / mesh.bounds.extents.x;
-		if (0.5f / mesh.bounds.extents.y < scale)
-			scale = 0.5f / mesh.bounds.extents.y;
-		if (0.5f / mesh.bounds.extents.z < scale)
-			scale = 0.5f / mesh.bounds.extents.z;
-
-		Vector3[] vertices = mesh.vertices;
-		int vi = 0;
-		while (vi < vertices.Length) {
-			vertices[vi] *= scale;
-			vi++;
-		}
-
-		mesh.vertices = vertices;
-		mesh.RecalculateBounds ();
-
-		Vector3 translate = mesh.bounds.center;
-		translate.x = 0 - mesh.bounds.center.x;
-		translate.y = 0 - mesh.bounds.center.y;
-		translate.z = 2 - mesh.bounds.center.z;
-
-		vi = 0;
-		while (vi < vertices.Length) {
-			vertices[vi] += translate;
-			vi++;
-		}
-		mesh.vertices = vertices;
 		mesh.RecalculateBounds ();
 		meshes.Add (mesh);
 
