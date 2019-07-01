@@ -92,7 +92,7 @@ public unsafe class DracoMeshLoader
 	}
 //*/
 
-	public UnityAction<List<Mesh>> onMeshesLoaded;
+	public UnityAction<Mesh> onMeshesLoaded;
 
 	public IEnumerator DecodeMesh(NativeArray<byte> data) {
 
@@ -120,15 +120,14 @@ public unsafe class DracoMeshLoader
 			yield break;
 		}
 
-		var meshes = new List<Mesh>();
-		CreateMesh(dracoMesh,ref meshes);
+		var mesh = CreateMesh(dracoMesh);
 
 		if(onMeshesLoaded!=null) {
-			onMeshesLoaded(meshes);
+			onMeshesLoaded(mesh);
 		}
 	}
 
-	unsafe int CreateMesh (IntPtr dracoMesh, ref List<Mesh> meshes)
+	unsafe Mesh CreateMesh (IntPtr dracoMesh)
 	{
 		DracoToUnityMesh* tmpMesh = (DracoToUnityMesh*) dracoMesh;
 
@@ -218,9 +217,8 @@ public unsafe class DracoMeshLoader
 			mesh.colors = newColors;
 		}
 		mesh.RecalculateBounds ();
-		meshes.Add (mesh);
 
-		return numFaces;
+		return mesh;
 	}
 
 	[System.Diagnostics.Conditional("DRACO_VERBOSE")]
