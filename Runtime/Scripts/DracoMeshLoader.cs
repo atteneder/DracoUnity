@@ -27,6 +27,12 @@ using Unity.Jobs;
 
 public unsafe class DracoMeshLoader
 {
+	#if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
+        public const string DRACODEC_UNITY_LIB = "__Internal";
+    #elif UNITY_ANDROID || UNITY_STANDALONE
+        public const string DRACODEC_UNITY_LIB = "basisu";
+    #endif
+
 	const Allocator defaultAllocator = Allocator.Persistent;
 
 	// Must stay the order to be consistent with C++ interface.
@@ -60,10 +66,10 @@ public unsafe class DracoMeshLoader
 		}
 	}
 
-	[DllImport ("dracodec_unity")] private static extern int DecodeMeshForUnity (
+	[DllImport (DRACODEC_UNITY_LIB)] private static extern int DecodeMeshForUnity (
 		void* buffer, int length, DracoToUnityMesh**tmpMesh);
 
-	[DllImport("dracodec_unity")] private static extern int ReleaseUnityMesh(DracoToUnityMesh** tmpMesh);
+	[DllImport(DRACODEC_UNITY_LIB)] private static extern int ReleaseUnityMesh(DracoToUnityMesh** tmpMesh);
 
 	private float ReadFloatFromIntPtr (IntPtr data, int offset)
 	{
