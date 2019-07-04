@@ -30,7 +30,7 @@ public unsafe class DracoMeshLoader
 	#if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
         public const string DRACODEC_UNITY_LIB = "__Internal";
     #elif UNITY_ANDROID || UNITY_STANDALONE
-        public const string DRACODEC_UNITY_LIB = "basisu";
+        public const string DRACODEC_UNITY_LIB = "dracodec_unity";
     #endif
 
 	const Allocator defaultAllocator = Allocator.Persistent;
