@@ -9,7 +9,7 @@ It is a fork of the [existing Unity integration](https://github.com/google/draco
 - Can be integrated into Projects easily via Package Manager
 - Is magnitudes faster due to
   - Bulk memory copies instead of per vertex/index data copy
-  - Multithreaded via C# Job system
+  - Multi-threaded via C# Job system
 - Supports single meshes with more than 65536 vertices (old split algorithm was broken)
 - Additional native libs and support for platforms
   - WebGL
