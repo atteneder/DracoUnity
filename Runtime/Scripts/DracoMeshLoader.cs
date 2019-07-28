@@ -33,7 +33,7 @@ public unsafe class DracoMeshLoader
         public const string DRACODEC_UNITY_LIB = "dracodec_unity";
     #endif
 
-	const Allocator defaultAllocator = Allocator.Persistent;
+	public const Allocator defaultAllocator = Allocator.Persistent;
 
 	// Must stay the order to be consistent with C++ interface.
 	[StructLayout (LayoutKind.Sequential)] private struct DracoToUnityMesh
@@ -50,10 +50,10 @@ public unsafe class DracoMeshLoader
 		public IntPtr color;
 	}
 
-	struct DracoJob : IJob {
+	public struct DracoJob : IJob {
 
 		[ReadOnly]
-		public NativeArray<byte> data;
+		public NativeSlice<byte> data;
 
 		public NativeArray<IntPtr> outMesh;
 
@@ -150,7 +150,7 @@ public unsafe class DracoMeshLoader
 	}
 #endif
 
-	unsafe Mesh CreateMesh (IntPtr dracoMesh)
+	public unsafe static Mesh CreateMesh (IntPtr dracoMesh)
 	{
 		Profiler.BeginSample("CreateMesh");
 		DracoToUnityMesh* tmpMesh = (DracoToUnityMesh*) dracoMesh;
