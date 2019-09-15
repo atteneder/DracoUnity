@@ -25,7 +25,7 @@ You have to manually add the package's URL into your [project manifest](https://
 Inside your Unity project there's the folder `Packages` containing a file called `manifest.json`. You have to open it and add the following line inside the `dependencies` category:
 
 ```json
-"com.atteneder.draco": "https://github.com/atteneder/DracoUnity.git",
+"com.atteneder.draco": "https://gitlab.com/atteneder/DracoUnity.git",
 ```
 
 It should look something like this:
@@ -33,7 +33,7 @@ It should look something like this:
 ```json
 {
   "dependencies": {
-    "com.atteneder.draco": "https://github.com/atteneder/DracoUnity.git",
+    "com.atteneder.draco": "https://gitlab.com/atteneder/DracoUnity.git",
     "com.unity.package-manager-ui": "2.1.2",
     "com.unity.modules.unitywebrequest": "1.0.0"
     ...
