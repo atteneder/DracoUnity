@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Unity 2018.2 backwards compatibility
+### Fixed
+- Reference assembly definition by name instead of GUID to avoid package import errors
 
 ## [1.0.1] - 2019-09-15
 ### Changed
