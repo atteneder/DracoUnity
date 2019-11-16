@@ -61,7 +61,13 @@ public class DracoFileImporter : AssetPostprocessor {
         newAsset.AddComponent<MeshRenderer>();
         
         bool success;
-        PrefabUtility.SaveAsPrefabAsset(newAsset, Path.Combine(dir, fileName + ".prefab"), out success);
+        var path = Path.Combine(dir, fileName + ".prefab");
+#if UNITY_2018_3_OR_NEWER
+        PrefabUtility.SaveAsPrefabAsset(newAsset, path, out success);
+#else
+        PrefabUtility.CreatePrefab(path, newAsset);
+        success=true;
+#endif
 
         Object.DestroyImmediate(newAsset);
 
