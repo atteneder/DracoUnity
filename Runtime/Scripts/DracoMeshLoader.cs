@@ -228,14 +228,15 @@ public unsafe class DracoMeshLoader
 
 		mesh.vertices = newVertices;
 		mesh.SetTriangles(newTriangles,0,true);
-		if (newUVs!=null) {
-			mesh.uv = newUVs;
-		}
 		if (newNormals!=null) {
 			mesh.normals = newNormals;
 		} else {
 			mesh.RecalculateNormals ();
 			Log ("Mesh doesn't have normals, recomputed.");
+		}
+		if (newUVs!=null) {
+			mesh.uv = newUVs;
+			mesh.RecalculateTangents();
 		}
 		if (newColors!=null) {
 			mesh.colors = newColors;

@@ -17,6 +17,7 @@ DracoUnity assumes Draco meshes to be right-handed Y-up coordinates and converts
   - Bulk memory copies instead of per vertex/index data copy
   - Multi-threaded via C# Job system
 - Supports single meshes with more than 65536 vertices (old split algorithm was broken)
+- Corrects tangents by re-calculating them if necessary
 - Additional native libs and support for platforms
   - WebGL
   - iOS armv7(s) and arm64
