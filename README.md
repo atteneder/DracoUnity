@@ -4,7 +4,13 @@ Unity package that integrates the [Draco 3D data compression library](https://go
 
 ![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via DracoUnity")
 
-It is a fork of the [existing Unity integration](https://github.com/google/draco/tree/master/unity) with the following improvements:
+It is a fork of the [existing Unity integration](https://github.com/google/draco/tree/master/unity)
+
+## Differences
+
+DracoUnity assumes Draco meshes to be right-handed Y-up coordinates and converts them to Unity's left-handed Y-up by flipping the Z-axis.
+
+## Improvements
 
 - Can be integrated into Projects easily via Package Manager
 - Is magnitudes faster due to
@@ -57,6 +63,57 @@ TODO: add usage example code
 Like this demo? You can show your appreciation and ...
 
 [![Buy me a coffee](https://az743702.vo.msecnd.net/cdn/kofi1.png?v=0)](https://ko-fi.com/C0C3BW7G)
+
+## Develop
+
+To develop this package, check out the repository and add it as local repository in the Unity Package Manager.
+
+### Build Draco library
+
+In case you need a custom or updated build of the dracodec_unity library, first read the [original documentation](https://github.com/google/draco/tree/master/unity#build-from-source) on how to build it.
+
+Additionally make sure, you enable the `BUILD_FOR_GLTF` flag, in order to enable all necessary features.
+
+#### CMake config
+
+General cmake command to build for the current platform
+
+```bash
+cmake ../draco \
+-DCMAKE_BUILD_TYPE=Release \
+-DBUILD_FOR_GLTF=TRUE \
+-DBUILD_UNITY_PLUGIN=TRUE
+```
+
+#### CMake config iOS
+
+iOS needs some additional params
+
+```bash
+cmake ../draco -G Xcode \
+-DCMAKE_SYSTEM_NAME=iOS \
+-DCMAKE_OSX_ARCHITECTURES=armv7\;armv7s\;arm64 \
+-DCMAKE_OSX_DEPLOYMENT_TARGET=10.0 \
+-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
+-DBUILD_FOR_GLTF=TRUE \
+-DBUILD_UNITY_PLUGIN=TRUE
+```
+
+#### WebGL emscripten
+
+Emscripten can compile code into a bitcode library (.bc), which Unity links during its Build.
+
+This bitcode library was built with a custom command like this:
+
+```bash
+emcc -O2 -std=c++11 -I. -Iinc -o dracodec_unity.bc -s WASM=1 \
+-DDRACO_MESH_COMPRESSION_SUPPORTED -DDRACO_NORMAL_ENCODING_SUPPORTED -DDRACO_STANDARD_EDGEBREAKER_SUPPORTED \
+<list of all needed draco source files>
+```
+
+Make sure to use the fastcomp variant of emscripten. The LLVM did not work for me (with Unity 2019.2)
+
+TODO: Properly build library via CMake.
 
 ## License
 
