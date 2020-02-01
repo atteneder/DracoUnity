@@ -241,8 +241,8 @@ public unsafe class DracoMeshLoader
 		if (newColors!=null) {
 			mesh.colors = newColors;
 		}
-
-		Profiler.EndSample();
+		Profiler.EndSample(); // CreateMeshFeeding
+		Profiler.EndSample(); // CreateMesh
 		return mesh;
 	}
 
