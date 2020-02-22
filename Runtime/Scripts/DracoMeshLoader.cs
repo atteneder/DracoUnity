@@ -29,7 +29,7 @@ public unsafe class DracoMeshLoader
 {
 	#if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
         public const string DRACODEC_UNITY_LIB = "__Internal";
-    #elif UNITY_ANDROID || UNITY_STANDALONE
+    #elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR
         public const string DRACODEC_UNITY_LIB = "dracodec_unity";
     #endif
 
