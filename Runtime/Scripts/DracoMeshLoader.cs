@@ -110,7 +110,16 @@ public unsafe class DracoMeshLoader
 			yield break;
 		}
 
-		var mesh = CreateMesh(dracoMesh);
+		bool hasTexcoords;
+		bool hasNormals;
+		var mesh = CreateMesh(dracoMesh,out hasNormals, out hasTexcoords);
+
+		if(!hasNormals) {
+			mesh.RecalculateNormals();
+		}
+		if(hasTexcoords) {
+			mesh.RecalculateTangents();
+		}
 
 		if(onMeshesLoaded!=null) {
 			onMeshesLoaded(mesh);
@@ -146,11 +155,22 @@ public unsafe class DracoMeshLoader
 			return null;
 		}
 
-		return CreateMesh(dracoMesh);
+		bool hasTexcoords;
+		bool hasNormals;
+		var mesh = CreateMesh(dracoMesh, out hasNormals, out hasTexcoords);
+		
+		if(!hasNormals) {
+			mesh.RecalculateNormals();
+		}
+		if(hasTexcoords) {
+			mesh.RecalculateTangents();
+		}
+
+		return mesh;
 	}
 #endif
 
-	public unsafe static Mesh CreateMesh (IntPtr dracoMesh)
+	public unsafe static Mesh CreateMesh (IntPtr dracoMesh, out bool hasNormals, out bool hasTexcoords)
 	{
 		Profiler.BeginSample("CreateMesh");
 		DracoToUnityMesh* tmpMesh = (DracoToUnityMesh*) dracoMesh;
@@ -182,7 +202,10 @@ public unsafe class DracoMeshLoader
 		UnsafeUtility.MemCpy(newVerticesPtr,posaddr,tmpMesh->numVertices * 12 );
 		Profiler.EndSample();
 
-		if (tmpMesh->hasTexcoord) {
+		hasTexcoords = tmpMesh->hasTexcoord;
+		hasNormals = tmpMesh->hasNormal;
+
+		if (hasTexcoords) {
 			Profiler.BeginSample("CreateMeshUVs");
 			Log ("Decoded mesh texcoords.");
 			newUVs = new Vector2[tmpMesh->numVertices];
@@ -191,7 +214,7 @@ public unsafe class DracoMeshLoader
 			UnsafeUtility.MemCpy(newUVsPtr,uvaddr,tmpMesh->numVertices * 8 );
 			Profiler.EndSample();
 		}
-		if (tmpMesh->hasNormal) {
+		if (hasNormals) {
 			Profiler.BeginSample("CreateMeshNormals");
 			Log ("Decoded mesh normals.");
 			newNormals = new Vector3[tmpMesh->numVertices];
@@ -230,13 +253,9 @@ public unsafe class DracoMeshLoader
 		mesh.SetTriangles(newTriangles,0,true);
 		if (newNormals!=null) {
 			mesh.normals = newNormals;
-		} else {
-			mesh.RecalculateNormals ();
-			Log ("Mesh doesn't have normals, recomputed.");
 		}
 		if (newUVs!=null) {
 			mesh.uv = newUVs;
-			mesh.RecalculateTangents();
 		}
 		if (newColors!=null) {
 			mesh.colors = newColors;
