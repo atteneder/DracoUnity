@@ -48,6 +48,10 @@ public unsafe class DracoMeshLoader
 		public IntPtr texcoord;
 		public bool hasColor;
 		public IntPtr color;
+		public bool hasWeights;
+		public IntPtr weights;
+		public bool hasJoints;
+		public IntPtr joints;
 	}
 
 	public struct DracoJob : IJob {
@@ -59,16 +63,18 @@ public unsafe class DracoMeshLoader
 
 		public NativeArray<int> result;
 
+		public int weightsId;
+		public int jointsId;
+
 		public void Execute() {
 			DracoToUnityMesh* tmpMesh;
-			result[0] = DecodeMeshForUnity (data.GetUnsafeReadOnlyPtr(), data.Length, &tmpMesh);
+			result[0] = DecodeMeshForUnity (data.GetUnsafeReadOnlyPtr(), data.Length, &tmpMesh, weightsId, jointsId);
 			outMesh[0] = (IntPtr) tmpMesh;
 		}
 	}
 
 	[DllImport (DRACODEC_UNITY_LIB)] private static extern int DecodeMeshForUnity (
-		void* buffer, int length, DracoToUnityMesh**tmpMesh);
-
+		void* buffer, int length, DracoToUnityMesh**tmpMesh, int weightsId = -1, int jointsId = -1);
 	[DllImport(DRACODEC_UNITY_LIB)] private static extern int ReleaseUnityMesh(DracoToUnityMesh** tmpMesh);
 
 	private float ReadFloatFromIntPtr (IntPtr data, int offset)
@@ -90,6 +96,8 @@ public unsafe class DracoMeshLoader
 		job.data = data;
 		job.result = new NativeArray<int>(1,defaultAllocator);
 		job.outMesh = new NativeArray<IntPtr>(1,defaultAllocator);
+		job.weightsId = -1;
+		job.jointsId = -1;
 
 		var jobHandle = job.Schedule();
 		Profiler.EndSample();
@@ -140,6 +148,8 @@ public unsafe class DracoMeshLoader
 		job.data = data;
 		job.result = new NativeArray<int>(1,defaultAllocator);
 		job.outMesh = new NativeArray<IntPtr>(1,defaultAllocator);
+		job.weightsId = -1;
+		job.jointsId = -1;
 
 		job.Run();
 		Profiler.EndSample();
@@ -186,6 +196,8 @@ public unsafe class DracoMeshLoader
 		Vector2[] newUVs = null;
 		Vector3[] newNormals = null;
 		Color[] newColors = null;
+		Vector4[] newWeights = null;
+		int[] newJoints = null;
 
 		Profiler.BeginSample("CreateMeshIndices");
 		byte* indicesSrc = (byte*)tmpMesh->indices;
@@ -232,6 +244,23 @@ public unsafe class DracoMeshLoader
 			UnsafeUtility.MemCpy(newColorsPtr,coloraddr,tmpMesh->numVertices * 16 );
 			Profiler.EndSample();
 		}
+		if (tmpMesh->hasWeights && tmpMesh->hasJoints) {
+			Profiler.BeginSample("CreateWeights");
+			Log ("Decoded mesh weights.");
+			newWeights = new Vector4[tmpMesh->numVertices];
+			byte* weightsAddr = (byte*)tmpMesh->weights;
+			var newWeightsPtr = UnsafeUtility.AddressOf(ref newWeights[0]);
+			UnsafeUtility.MemCpy(newWeightsPtr,weightsAddr,tmpMesh->numVertices * 16 );
+			Profiler.EndSample();
+
+			Profiler.BeginSample("CreateJoints");
+			Log ("Decoded mesh joints.");
+			newJoints = new int[tmpMesh->numVertices*4];
+			byte* jointsAddr = (byte*)tmpMesh->joints;
+			var newJointsPtr = UnsafeUtility.AddressOf(ref newJoints[0]);
+			UnsafeUtility.MemCpy(newJointsPtr,jointsAddr,tmpMesh->numVertices * 16 );
+			Profiler.EndSample();
+		}
 
 		Profiler.BeginSample("CreateMeshRelease");
 		ReleaseUnityMesh (&tmpMesh);
@@ -259,6 +288,23 @@ public unsafe class DracoMeshLoader
 		}
 		if (newColors!=null) {
 			mesh.colors = newColors;
+		}
+		if (newJoints!=null && newWeights!=null) {
+			BoneWeight[] weights = new BoneWeight[newWeights.Length];
+
+			for (int i = 0; i < weights.Length; i++)
+			{
+				weights[i].boneIndex0 = newJoints[i*4];
+				weights[i].boneIndex1 = newJoints[i*4+1];
+				weights[i].boneIndex2 = newJoints[i*4+2];
+				weights[i].boneIndex3 = newJoints[i*4+3];
+
+				weights[i].weight0 = newWeights[i].x;
+				weights[i].weight1 = newWeights[i].y;
+				weights[i].weight2 = newWeights[i].y;
+				weights[i].weight3 = newWeights[i].z;
+			}
+			mesh.boneWeights = weights;
 		}
 		Profiler.EndSample(); // CreateMeshFeeding
 		Profiler.EndSample(); // CreateMesh
