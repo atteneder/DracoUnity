@@ -294,15 +294,24 @@ public unsafe class DracoMeshLoader
 
 			for (int i = 0; i < weights.Length; i++)
 			{
-				weights[i].boneIndex0 = newJoints[i*4];
-				weights[i].boneIndex1 = newJoints[i*4+1];
-				weights[i].boneIndex2 = newJoints[i*4+2];
-				weights[i].boneIndex3 = newJoints[i*4+3];
+				Tuple<float,int>[] values = new Tuple<float, int>[]{
+					new Tuple<float, int>(newWeights[i].x,newJoints[i*4]),
+					new Tuple<float, int>(newWeights[i].y,newJoints[i*4+1]),
+					new Tuple<float, int>(newWeights[i].z,newJoints[i*4+2]),
+					new Tuple<float, int>(newWeights[i].w,newJoints[i*4+3])
+				};
 
-				weights[i].weight0 = newWeights[i].x;
-				weights[i].weight1 = newWeights[i].y;
-				weights[i].weight2 = newWeights[i].z;
-				weights[i].weight3 = newWeights[i].w;
+				Array.Sort(values, (a,b) => { return b.Item1.CompareTo(a.Item1); } );
+
+				weights[i].boneIndex0 = values[0].Item2;
+				weights[i].boneIndex1 = values[1].Item2;
+				weights[i].boneIndex2 = values[2].Item2;
+				weights[i].boneIndex3 = values[3].Item2;
+
+				weights[i].weight0 = values[0].Item1;
+				weights[i].weight1 = values[1].Item1;
+				weights[i].weight2 = values[2].Item1;
+				weights[i].weight3 = values[3].Item1;
 			}
 			mesh.boneWeights = weights;
 		}
