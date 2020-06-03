@@ -301,8 +301,8 @@ public unsafe class DracoMeshLoader
 
 				weights[i].weight0 = newWeights[i].x;
 				weights[i].weight1 = newWeights[i].y;
-				weights[i].weight2 = newWeights[i].y;
-				weights[i].weight3 = newWeights[i].z;
+				weights[i].weight2 = newWeights[i].z;
+				weights[i].weight3 = newWeights[i].w;
 			}
 			mesh.boneWeights = weights;
 		}
