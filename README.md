@@ -1,32 +1,16 @@
-# DracoUnity
+# Draco 3D Data Compression Unity Package
 
 Unity package that integrates the [Draco 3D data compression library](https://google.github.io/draco) within Unity.
 
-![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via DracoUnity")
-
-It is a fork of the [existing Unity integration](https://github.com/google/draco/tree/master/unity)
-
-## Differences
-
-DracoUnity assumes Draco meshes to be right-handed Y-up coordinates and converts them to Unity's left-handed Y-up by flipping the Z-axis.
-
-## Improvements
-
-- Can be integrated into Projects easily via Package Manager
-- Is magnitudes faster due to
-  - Bulk memory copies instead of per vertex/index data copy
-  - Multi-threaded via C# Job system
-- Supports single meshes with more than 65536 vertices (old split algorithm was broken)
-- Supports loading joint index and joint weights for skinning
-- Corrects tangents by re-calculating them if necessary
-- Additional native libs and support for platforms
-  - WebGL
-  - iOS armv7(s) and arm64
-  - Windows 32-bit
-  - Linux 64-bit and 32-bit
-  - Android x86
+![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via Draco 3D Data Compression Unity Package")
 
 ## Installing
+
+The easiest way to install is to download and open the [Installer Package](https://package-installer.glitch.me/v1/installer/OpenUPM/com.atteneder.draco?registry=https%3A%2F%2Fpackage.openupm.com&scope=com.atteneder)
+
+It runs a script that installs the Draco 3D Data Compression Unity Package via a [scoped registry](https://docs.unity3d.com/Manual/upm-scoped.html). After that it is listed in the *Package Manager* and can be updated from there.
+
+<details><summary>Alternative: Install via GIT URL</summary>
 
 You have to manually add the package's URL into your [project manifest](https://docs.unity3d.com/Manual/upm-manifestPrj.html)
 
@@ -51,6 +35,8 @@ It should look something like this:
 
 Next time you open your project in Unity, it will download the package automatically. You have to have a GIT LFS client (large file support) installed on your system. Otherwise you will get an error that the native library file (dll on Windows) is corrupt. There's more detail about how to add packages via GIT URLs in the [Unity documentation](https://docs.unity3d.com/Manual/upm-git.html).
 
+</details>
+
 ## Using
 
 There's a simple demo project that shows how you can use it:
@@ -59,6 +45,30 @@ There's a simple demo project that shows how you can use it:
 
 
 TODO: add usage example code
+
+## Origin
+
+This project is a fork of the [existing Unity integration](https://github.com/google/draco/tree/master/unity)
+
+### Differences
+
+Draco 3D Data Compression Unity Package assumes Draco meshes to be right-handed Y-up coordinates and converts them to Unity's left-handed Y-up by flipping the Z-axis.
+
+### Improvements
+
+- Can be integrated into Projects easily via Package Manager
+- Is magnitudes faster due to
+  - Bulk memory copies instead of per vertex/index data copy
+  - Multi-threaded via C# Job system
+- Supports single meshes with more than 65536 vertices (old split algorithm was broken)
+- Supports loading joint index and joint weights for skinning
+- Corrects tangents by re-calculating them if necessary
+- Additional native libs and support for platforms
+  - WebGL
+  - iOS armv7(s) and arm64
+  - Windows 32-bit
+  - Linux 64-bit and 32-bit
+  - Android x86
 
 ## Support
 
