@@ -51,10 +51,7 @@ Next time you open your project in Unity, it will download the package automatic
 
 ## Using
 
-There's a simple demo project that shows how you can use it:
-
-<https://github.com/atteneder/DracoUnityDemo>
-
+A usage example can be found in the [DracoUnityDemo](https://github.com/atteneder/DracoUnityDemo) project.
 
 TODO: add usage example code
 
