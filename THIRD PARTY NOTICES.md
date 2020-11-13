@@ -1,3 +1,5 @@
-# Third party notices
+This package contains third-party software components governed by the license(s) indicated below:
 
-Includes [Google](https://about.google)'s [Draco 3D data compression library](https://google.github.io/draco) (released under the terms of Apache License 2.0).
+Component Name: Draco 3D data compression library
+License Type: "Apache License 2.0"
+[Draco 3D data compression library License](https://github.com/google/draco/blob/master/LICENSE)
