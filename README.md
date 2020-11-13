@@ -1,5 +1,7 @@
 # Draco 3D Data Compression Unity Package
 
+[![openupm](https://img.shields.io/npm/v/com.atteneder.draco?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.atteneder.draco/)
+
 Unity package that integrates the [Draco 3D data compression library](https://google.github.io/draco) within Unity.
 
 ![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via Draco 3D Data Compression Unity Package")
