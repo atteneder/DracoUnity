@@ -6,6 +6,16 @@ Unity package that integrates the [Draco 3D data compression library](https://go
 
 ![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via Draco 3D Data Compression Unity Package")
 
+Following build targets are supported
+
+- WebGL
+- iOS (arm64 and armv7a)
+- Android (x86, arm64 and armv7a)
+- Windows (64 and 32 bit)
+- Universal Windows Platform (x64,x86,ARM,ARM64)
+- macOS (Apple Silicon an Intel)
+- Linux (64 and 32 bit)
+
 ## Installing
 
 The easiest way to install is to download and open the [Installer Package](https://package-installer.glitch.me/v1/installer/OpenUPM/com.atteneder.draco?registry=https%3A%2F%2Fpackage.openupm.com&scope=com.atteneder)
