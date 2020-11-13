@@ -81,6 +81,8 @@ Draco 3D Data Compression Unity Package assumes Draco meshes to be right-handed 
   - Windows 32-bit
   - Linux 64-bit and 32-bit
   - Android x86
+  - Universal Windows Platform (x64,x86,ARM,ARM64)
+  - macOS Apple Silicon
 
 ## Support
 
@@ -94,50 +96,9 @@ To develop this package, check out the repository and add it as local repository
 
 ### Build Draco library
 
-In case you need a custom or updated build of the dracodec_unity library, first read the [original documentation](https://github.com/google/draco/tree/master/unity#build-from-source) on how to build it.
+The native libraries are built via CI in this [GitHub action](https://github.com/atteneder/draco/actions?query=workflow%3A%22Draco+Decoder+Unity+library+CI%22)
 
-Additionally make sure, you enable the `BUILD_FOR_GLTF` flag, in order to enable all necessary features.
-
-#### CMake config
-
-General cmake command to build for the current platform
-
-```bash
-cmake ../draco \
--DCMAKE_BUILD_TYPE=Release \
--DBUILD_FOR_GLTF=TRUE \
--DBUILD_UNITY_PLUGIN=TRUE
-```
-
-#### CMake config iOS
-
-iOS needs some additional params
-
-```bash
-cmake ../draco -G Xcode \
--DCMAKE_SYSTEM_NAME=iOS \
--DCMAKE_OSX_ARCHITECTURES=armv7\;armv7s\;arm64 \
--DCMAKE_OSX_DEPLOYMENT_TARGET=10.0 \
--DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
--DBUILD_FOR_GLTF=TRUE \
--DBUILD_UNITY_PLUGIN=TRUE
-```
-
-#### WebGL emscripten
-
-Emscripten can compile code into a bitcode library (.bc), which Unity links during its Build.
-
-This bitcode library was built with a custom command like this:
-
-```bash
-emcc -O2 -std=c++11 -I. -Iinc -o dracodec_unity.bc -s WASM=1 \
--DDRACO_MESH_COMPRESSION_SUPPORTED -DDRACO_NORMAL_ENCODING_SUPPORTED -DDRACO_STANDARD_EDGEBREAKER_SUPPORTED \
-<list of all needed draco source files>
-```
-
-Make sure to use the fastcomp variant of emscripten. The LLVM did not work for me (with Unity 2019.2)
-
-TODO: Properly build library via CMake.
+Look into the YAML file to see how the project is built with CMake.
 
 ## License
 
