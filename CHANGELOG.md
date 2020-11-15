@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Re-built all libraries with updated environments (Xcode, Android NDK, Emscripten, etc.)
 - WebAssembly lib is now built by draco CI as well
+### Fixed
+- macOS library is now excluded from other platform builds (thanks Cameron Newnham <cam@fologram.com>)
 
 ## [1.3.0] - 2020-09-17
 ### Added
