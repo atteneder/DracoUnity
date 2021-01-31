@@ -24,7 +24,7 @@ It runs a script that installs the Draco 3D Data Compression Unity Package via a
 
 ### Troubleshooting - Missing code signing
 
-The binary libraries used in this package are not code-signed. macOS in particular will not let you load the `ktx_unity.bundle` for that reason (see [issue](/atteneder/DracoUnity/issues/4)).
+The binary libraries used in this package are not code-signed. macOS in particular will not let you load the `ktx_unity.bundle` for that reason (see [issue](https://github.com/atteneder/DracoUnity/issues/4)).
 
 Here's the steps to make it work on macOS
 
@@ -36,7 +36,7 @@ Here's the steps to make it work on macOS
 
 If you want to deploy your software using DracoUnity you either have to
 
-- Wait until there is proper code-sign setup (watch this project or subscribe to the [corresponding issue](/atteneder/DracoUnity/issues/4)).
+- Wait until there is proper code-sign setup (watch this project or subscribe to the [corresponding issue](https://github.com/atteneder/DracoUnity/issues/4)).
 - Build your own library from [the source draco repository](https://github.com/atteneder/draco) (note that it's not the original Google repository) and sign it with your own credentials/Apple profile.
 
 <details><summary>Alternative: Install via GIT URL</summary>
