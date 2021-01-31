@@ -6,11 +6,38 @@ Unity package that integrates the [Draco 3D data compression library](https://go
 
 ![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via Draco 3D Data Compression Unity Package")
 
+Following build targets are supported
+
+- WebGL
+- iOS (arm64 and armv7a)
+- Android (x86, arm64 and armv7a)
+- Windows (64 and 32 bit)
+- Universal Windows Platform (x64,x86,ARM,ARM64)
+- macOS (Apple Silicon an Intel)
+- Linux (64 and 32 bit)
+
 ## Installing
 
 The easiest way to install is to download and open the [Installer Package](https://package-installer.glitch.me/v1/installer/OpenUPM/com.atteneder.draco?registry=https%3A%2F%2Fpackage.openupm.com&scope=com.atteneder)
 
 It runs a script that installs the Draco 3D Data Compression Unity Package via a [scoped registry](https://docs.unity3d.com/Manual/upm-scoped.html). After that it is listed in the *Package Manager* and can be updated from there.
+
+### Troubleshooting - Missing code signing
+
+The binary libraries used in this package are not code-signed. macOS in particular will not let you load the `ktx_unity.bundle` for that reason (see [issue](/atteneder/DracoUnity/issues/4)).
+
+Here's the steps to make it work on macOS
+
+1. When you first open a project with DracoUnity (or add the package), you get prompted to remove the "broken" ktx_unity.bundle. Don't do it and click "cancel" instead.
+2. Open the macOS "System Preferencess" and go to "Security & Privacy". At the bottom of the "General" tab you should see a warning about ktx_unity.bundle. Click the "Allow anyways" button besides it.
+3. Restart Unity
+4. Now you get another, similar prompt (see step 1) with the third option "Open". Click it
+5. Now it should work (at least for development on your machine)
+
+If you want to deploy your software using DracoUnity you either have to
+
+- Wait until there is proper code-sign setup (watch this project or subscribe to the [corresponding issue](/atteneder/DracoUnity/issues/4)).
+- Build your own library from [the source draco repository](https://github.com/atteneder/draco) (note that it's not the original Google repository) and sign it with your own credentials/Apple profile.
 
 <details><summary>Alternative: Install via GIT URL</summary>
 
@@ -41,10 +68,7 @@ Next time you open your project in Unity, it will download the package automatic
 
 ## Using
 
-There's a simple demo project that shows how you can use it:
-
-<https://github.com/atteneder/DracoUnityDemo>
-
+A usage example can be found in the [DracoUnityDemo](https://github.com/atteneder/DracoUnityDemo) project.
 
 TODO: add usage example code
 
@@ -71,6 +95,8 @@ Draco 3D Data Compression Unity Package assumes Draco meshes to be right-handed 
   - Windows 32-bit
   - Linux 64-bit and 32-bit
   - Android x86
+  - Universal Windows Platform (x64,x86,ARM,ARM64)
+  - macOS Apple Silicon
 
 ## Support
 
@@ -84,50 +110,9 @@ To develop this package, check out the repository and add it as local repository
 
 ### Build Draco library
 
-In case you need a custom or updated build of the dracodec_unity library, first read the [original documentation](https://github.com/google/draco/tree/master/unity#build-from-source) on how to build it.
+The native libraries are built via CI in this [GitHub action](https://github.com/atteneder/draco/actions?query=workflow%3A%22Draco+Decoder+Unity+library+CI%22)
 
-Additionally make sure, you enable the `BUILD_FOR_GLTF` flag, in order to enable all necessary features.
-
-#### CMake config
-
-General cmake command to build for the current platform
-
-```bash
-cmake ../draco \
--DCMAKE_BUILD_TYPE=Release \
--DBUILD_FOR_GLTF=TRUE \
--DBUILD_UNITY_PLUGIN=TRUE
-```
-
-#### CMake config iOS
-
-iOS needs some additional params
-
-```bash
-cmake ../draco -G Xcode \
--DCMAKE_SYSTEM_NAME=iOS \
--DCMAKE_OSX_ARCHITECTURES=armv7\;armv7s\;arm64 \
--DCMAKE_OSX_DEPLOYMENT_TARGET=10.0 \
--DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
--DBUILD_FOR_GLTF=TRUE \
--DBUILD_UNITY_PLUGIN=TRUE
-```
-
-#### WebGL emscripten
-
-Emscripten can compile code into a bitcode library (.bc), which Unity links during its Build.
-
-This bitcode library was built with a custom command like this:
-
-```bash
-emcc -O2 -std=c++11 -I. -Iinc -o dracodec_unity.bc -s WASM=1 \
--DDRACO_MESH_COMPRESSION_SUPPORTED -DDRACO_NORMAL_ENCODING_SUPPORTED -DDRACO_STANDARD_EDGEBREAKER_SUPPORTED \
-<list of all needed draco source files>
-```
-
-Make sure to use the fastcomp variant of emscripten. The LLVM did not work for me (with Unity 2019.2)
-
-TODO: Properly build library via CMake.
+Look into the YAML file to see how the project is built with CMake.
 
 ## License
 
