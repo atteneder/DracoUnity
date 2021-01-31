@@ -22,6 +22,23 @@ The easiest way to install is to download and open the [Installer Package](https
 
 It runs a script that installs the Draco 3D Data Compression Unity Package via a [scoped registry](https://docs.unity3d.com/Manual/upm-scoped.html). After that it is listed in the *Package Manager* and can be updated from there.
 
+### Troubleshooting - Missing code signing
+
+The binary libraries used in this package are not code-signed. macOS in particular will not let you load the `ktx_unity.bundle` for that reason (see [issue](/atteneder/DracoUnity/issues/4)).
+
+Here's the steps to make it work on macOS
+
+1. When you first open a project with DracoUnity (or add the package), you get prompted to remove the "broken" ktx_unity.bundle. Don't do it and click "cancel" instead.
+2. Open the macOS "System Preferencess" and go to "Security & Privacy". At the bottom of the "General" tab you should see a warning about ktx_unity.bundle. Click the "Allow anyways" button besides it.
+3. Restart Unity
+4. Now you get another, similar prompt (see step 1) with the third option "Open". Click it
+5. Now it should work (at least for development on your machine)
+
+If you want to deploy your software using DracoUnity you either have to
+
+- Wait until there is proper code-sign setup (watch this project or subscribe to the [corresponding issue](/atteneder/DracoUnity/issues/4)).
+- Build your own library from [the source draco repository](https://github.com/atteneder/draco) (note that it's not the original Google repository) and sign it with your own credentials/Apple profile.
+
 <details><summary>Alternative: Install via GIT URL</summary>
 
 You have to manually add the package's URL into your [project manifest](https://docs.unity3d.com/Manual/upm-manifestPrj.html)
