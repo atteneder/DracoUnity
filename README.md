@@ -1,6 +1,8 @@
 # Draco 3D Data Compression Unity Package
 
 [![openupm](https://img.shields.io/npm/v/com.atteneder.draco?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.atteneder.draco/)
+[![GitHub issues](https://img.shields.io/github/issues/atteneder/DracoUnity)](https://github.com/atteneder/DracoUnity/issues)
+[![GitHub license](https://img.shields.io/github/license/atteneder/DracoUnity)](https://github.com/atteneder/DracoUnity/blob/main/LICENSE.md)
 
 Unity package that integrates the [Draco 3D data compression library](https://google.github.io/draco) within Unity.
 
