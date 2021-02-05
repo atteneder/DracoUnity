@@ -171,7 +171,6 @@ public unsafe class DracoMeshLoader
     }
     
     Mesh unityMesh = CreateUnityMesh(mesh);
-    UnityMeshToCamera(ref unityMesh);
     meshes.Add(unityMesh);
 
     int numFaces = mesh->numFaces;
@@ -341,47 +340,6 @@ public unsafe class DracoMeshLoader
     Profiler.EndSample();
     Profiler.EndSample();
     return mesh;
-  }
-
-  // Scale and translate the decoded mesh so it will be visible to
-  // a new camera's default settings.
-  public unsafe void UnityMeshToCamera(ref Mesh mesh)
-  {
-    float startTime = Time.realtimeSinceStartup;
-    mesh.RecalculateBounds();
-
-    float scale = 0.5f / mesh.bounds.extents.x;
-    if (0.5f / mesh.bounds.extents.y < scale) {
-      scale = 0.5f / mesh.bounds.extents.y;
-    }
-    if (0.5f / mesh.bounds.extents.z < scale) {
-      scale = 0.5f / mesh.bounds.extents.z;
-    }
-
-    Vector3[] vertices = mesh.vertices;
-    int i = 0;
-    while (i < vertices.Length) {
-      vertices[i] *= scale;
-      i++;
-    }
-
-    mesh.vertices = vertices;
-    mesh.RecalculateBounds();
-
-    Vector3 translate = mesh.bounds.center;
-    translate.x = 0 - mesh.bounds.center.x;
-    translate.y = 0 - mesh.bounds.center.y;
-    translate.z = 2 - mesh.bounds.center.z;
-
-    i = 0;
-    while (i < vertices.Length) {
-      vertices[i] += translate;
-      i++;
-    }
-    mesh.vertices = vertices;
-    float transformTimeMilli =
-        (Time.realtimeSinceStartup - startTime) * 1000.0f;
-    Debug.Log("transformTimeMilli: " + transformTimeMilli.ToString());
   }
 
   private int DataTypeSize(DataType dt) {
