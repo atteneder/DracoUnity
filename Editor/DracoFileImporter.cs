@@ -1,4 +1,4 @@
-﻿// Copyright 2019 The Draco Authors.
+﻿// Copyright 2017 The Draco Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,71 +12,58 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-using System.IO;
-using System.Globalization;
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using Unity.Collections;
 
 public class DracoFileImporter : AssetPostprocessor {
-
-  const string FILE_EXT = ".drc";
-  const string FILE_EXT_BYTES = ".drc.bytes";
-
   static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets,
       string[] movedAssets, string[] movedFromAssetPaths) {
     foreach(string str in importedAssets) {
       // Compressed file must be renamed to ".drc.bytes".
-      var extIndex = str.EndsWith(FILE_EXT,true,CultureInfo.InvariantCulture);
-      var extBytesIndex = str.EndsWith(FILE_EXT_BYTES,true,CultureInfo.InvariantCulture);
-
-      if ( !(extIndex||extBytesIndex) ) {
+      if (str.IndexOf(".drc.bytes") == -1) {
         return;
       }
 
+      // If the original mesh exceeds the limit of number of verices, the
+      // loader will split it to a list of smaller meshes.
+      List<Mesh> meshes = new List<Mesh>();
       DracoMeshLoader dracoLoader = new DracoMeshLoader();
 
-      int length = str.Length - (extIndex?4:6) - str.LastIndexOf('/') - 1;
+      // The decoded mesh will be named without ".drc.bytes"
+      str.LastIndexOf('/');
+      int length = str.Length - ".drc.bytes".Length - str.LastIndexOf('/') - 1;
       string fileName = str.Substring(str.LastIndexOf('/') + 1, length);
 
-      var data = File.ReadAllBytes(str);
-      var nativeData = new NativeArray<byte>(data.Length,Allocator.TempJob);
-      nativeData.CopyFrom(data);
-      var mesh = dracoLoader.DecodeMeshSync(nativeData);
-      nativeData.Dispose();
-
-      if (mesh!=null) {
-        mesh.name = fileName;
+      int numFaces = dracoLoader.LoadMeshFromAsset(fileName + ".drc", ref meshes);
+      if (numFaces > 0) {
         // Create mesh assets. Combine the smaller meshes to a single asset.
         // TODO: Figure out how to combine to an unseen object as .obj files.
-        var dir = Path.GetDirectoryName(str);
-        AssetDatabase.CreateAsset (mesh, Path.Combine(dir, fileName + ".asset" ));
+        AssetDatabase.CreateAsset (meshes [0], "Assets/Resources/" + fileName + ".asset");
         AssetDatabase.SaveAssets ();
-        
+        for (int i = 1; i < meshes.Count; ++i) {
+          AssetDatabase.AddObjectToAsset(meshes [i], meshes [0]);
+          AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath (meshes [i]));
+        }
+
         // Also create a Prefab for easy usage.
         GameObject newAsset = new GameObject();
         newAsset.hideFlags = HideFlags.HideInHierarchy;
-        var mf = newAsset.AddComponent<MeshFilter>();
-        mf.mesh = mesh;
-        newAsset.AddComponent<MeshRenderer>();
-        
-        bool success;
-        var path = Path.Combine(dir, fileName + ".prefab");
-#if UNITY_2018_3_OR_NEWER
-        PrefabUtility.SaveAsPrefabAsset(newAsset, path, out success);
-#else
-        PrefabUtility.CreatePrefab(path, newAsset);
-        success=true;
-#endif
-
-        Object.DestroyImmediate(newAsset);
-
-        if(!success) {
-          Debug.LogError("Creating Draco Prefab failed!");
+        for (int i = 0; i < meshes.Count; ++i) {
+          GameObject subObject = new GameObject();
+          subObject.hideFlags = HideFlags.HideInHierarchy;
+          subObject.AddComponent<MeshFilter>();
+          subObject.AddComponent<MeshRenderer>();
+          subObject.GetComponent<MeshFilter>().mesh =
+            UnityEngine.Object.Instantiate(meshes[i]);
+          subObject.transform.parent = newAsset.transform;
         }
+        PrefabUtility.CreatePrefab("Assets/Resources/" + fileName + ".prefab", newAsset);
       } else {
         // TODO: Throw exception?
-        Debug.LogError("Decodeing Draco file failed.");
+        Debug.Log("Error: Decodeing Draco file failed.");
       }
     }
   }
