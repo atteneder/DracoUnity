@@ -19,6 +19,7 @@ using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 public unsafe class DracoMeshLoader
 {
@@ -125,13 +126,13 @@ public unsafe class DracoMeshLoader
     TextAsset asset =
         Resources.Load(assetName, typeof(TextAsset)) as TextAsset;
     if (asset == null) {
-      Debug.Log ("Didn't load file!");
+      Debug.LogError ("Didn't load file!");
       return -1;
     }
     byte[] encodedData = asset.bytes;
-    Debug.Log(encodedData.Length.ToString());
+    // Debug.Log(encodedData.Length.ToString());
     if (encodedData.Length == 0) {
-      Debug.Log ("Didn't load encoded data!");
+      Debug.LogError ("Didn't load encoded data!");
       return -1;
     }
     return ConvertDracoMeshToUnity(encodedData, ref meshes);
@@ -139,7 +140,7 @@ public unsafe class DracoMeshLoader
 
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  public unsafe int ConvertDracoMeshToUnity(NativeArray<byte> encodedData,
+  public int ConvertDracoMeshToUnity(NativeArray<byte> encodedData,
     ref List<Mesh> meshes) {
     var encodedDataPtr = (byte*) encodedData.GetUnsafeReadOnlyPtr();
     return ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, ref meshes);
@@ -147,7 +148,7 @@ public unsafe class DracoMeshLoader
   
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  public unsafe int ConvertDracoMeshToUnity(byte[] encodedData,
+  public int ConvertDracoMeshToUnity(byte[] encodedData,
     ref List<Mesh> meshes) {
     var encodedDataPtr = (byte*) UnsafeUtility.PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
     var result = ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, ref meshes);
@@ -157,38 +158,36 @@ public unsafe class DracoMeshLoader
   
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  unsafe int ConvertDracoMeshToUnity(byte* encodedData, int size,
+  int ConvertDracoMeshToUnity(byte* encodedData, int size,
     ref List<Mesh> meshes)
   {
-
-    float startTime = Time.realtimeSinceStartup;
+    Profiler.BeginSample("DecodeDracoMesh");
     DracoMesh *mesh = null;
-    if (DecodeDracoMesh(encodedData, size, &mesh) <= 0) {
-      Debug.Log("Failed: Decoding error.");
+    var decodeDracoMesh = DecodeDracoMesh(encodedData, size, &mesh);
+    Profiler.EndSample();
+    if (decodeDracoMesh <= 0) {
+      Debug.LogError("Failed: Decoding error.");
       return -1;
     }
-
-    float decodeTimeMilli =
-        (Time.realtimeSinceStartup - startTime) * 1000.0f;
-    Debug.Log("decodeTimeMilli: " + decodeTimeMilli.ToString());
-
-    Debug.Log("Num indices: " + mesh->numFaces.ToString());
-    Debug.Log("Num vertices: " + mesh->numVertices.ToString());
-    Debug.Log("Num attributes: " + mesh->numAttributes.ToString());
-
+    
     Mesh unityMesh = CreateUnityMesh(mesh);
     UnityMeshToCamera(ref unityMesh);
     meshes.Add(unityMesh);
 
     int numFaces = mesh->numFaces;
+    Profiler.BeginSample("ReleaseDracoMesh");
     ReleaseDracoMesh(&mesh);
+    Profiler.EndSample();
     return numFaces;
   }
 
   // Creates a Unity mesh from the decoded Draco mesh.
   public unsafe Mesh CreateUnityMesh(DracoMesh *dracoMesh)
   {
-    float startTime = Time.realtimeSinceStartup;
+    
+    Profiler.BeginSample("CreateUnityMesh");
+    
+    Profiler.BeginSample("CreateUnityMesh.Allocate");
     int numFaces = dracoMesh->numFaces;
     int[] newTriangles = new int[dracoMesh->numFaces * 3];
     Vector3[] newVertices = new Vector3[dracoMesh->numVertices];
@@ -196,7 +195,9 @@ public unsafe class DracoMeshLoader
     Vector3[] newNormals = null;
     Color[] newColors = null;
     byte[] newGenerics = null;
-
+    Profiler.EndSample();
+    
+    Profiler.BeginSample("CreateUnityMesh.CopyIndices");
     // Copy face indices.
     DracoData *indicesData;
     GetMeshIndices(dracoMesh, &indicesData);
@@ -206,9 +207,13 @@ public unsafe class DracoMeshLoader
     var indicesPtr = UnsafeUtility.AddressOf(ref newTriangles[0]);
     UnsafeUtility.MemCpy(indicesPtr, indices,
                          newTriangles.Length * elementSize);
+    Profiler.EndSample();
+    Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
     ReleaseDracoData(&indicesData);
+    Profiler.EndSample();
 
     // Copy positions.
+    Profiler.BeginSample("CreateUnityMesh.CopyPositions");
     DracoAttribute *attr = null;
     GetAttributeByType(dracoMesh, AttributeType.POSITION, 0, &attr);
     DracoData* posData = null;
@@ -218,13 +223,17 @@ public unsafe class DracoMeshLoader
     var newVerticesPtr = UnsafeUtility.AddressOf(ref newVertices[0]);
     UnsafeUtility.MemCpy(newVerticesPtr, (void*)posData->data,
                          dracoMesh->numVertices * elementSize);
+    Profiler.EndSample();
+    Profiler.BeginSample("CreateUnityMesh.ReleasePositions");
     ReleaseDracoData(&posData);
     ReleaseDracoAttribute(&attr);
+    Profiler.EndSample();
 
     // Copy normals.
     if (GetAttributeByType(dracoMesh, AttributeType.NORMAL, 0, &attr)) {
       DracoData* normData = null;
       if (GetAttributeData(dracoMesh, attr, &normData)) {
+        Profiler.BeginSample("CreateUnityMesh.CopyNormals");
         elementSize =
             DataTypeSize((DracoMeshLoader.DataType)normData->dataType) *
                 attr->numComponents;
@@ -232,9 +241,11 @@ public unsafe class DracoMeshLoader
         var newNormalsPtr = UnsafeUtility.AddressOf(ref newNormals[0]);
         UnsafeUtility.MemCpy(newNormalsPtr, (void*)normData->data,
                              dracoMesh->numVertices * elementSize);
-        Debug.Log("Decoded mesh normals.");
+        Profiler.EndSample();
+        Profiler.BeginSample("CreateUnityMesh.ReleaseNormals");
         ReleaseDracoData(&normData);
         ReleaseDracoAttribute(&attr);
+        Profiler.EndSample();
       }
     }
 
@@ -242,6 +253,7 @@ public unsafe class DracoMeshLoader
     if (GetAttributeByType(dracoMesh, AttributeType.TEX_COORD, 0, &attr)) {
       DracoData* texData = null;
       if (GetAttributeData(dracoMesh, attr, &texData)) {
+        Profiler.BeginSample("CreateUnityMesh.CopyTexCoords");
         elementSize =
             DataTypeSize((DracoMeshLoader.DataType)texData->dataType) *
             attr->numComponents;
@@ -249,9 +261,11 @@ public unsafe class DracoMeshLoader
         var newUVsPtr = UnsafeUtility.AddressOf(ref newUVs[0]);
         UnsafeUtility.MemCpy(newUVsPtr, (void*)texData->data,
                              dracoMesh->numVertices * elementSize);
-        Debug.Log("Decoded mesh texcoords.");
+        Profiler.EndSample();
+        Profiler.BeginSample("CreateUnityMesh.ReleaseTexCoords");
         ReleaseDracoData(&texData);
         ReleaseDracoAttribute(&attr);
+        Profiler.EndSample();
       }
     }
 
@@ -259,6 +273,7 @@ public unsafe class DracoMeshLoader
     if (GetAttributeByType(dracoMesh, AttributeType.COLOR, 0, &attr)) {
       DracoData* colorData = null;
       if (GetAttributeData(dracoMesh, attr, &colorData)) {
+        Profiler.BeginSample("CreateUnityMesh.CopyColors");
         elementSize =
             DataTypeSize((DracoMeshLoader.DataType)colorData->dataType) *
             attr->numComponents;
@@ -266,9 +281,11 @@ public unsafe class DracoMeshLoader
         var newColorsPtr = UnsafeUtility.AddressOf(ref newColors[0]);
         UnsafeUtility.MemCpy(newColorsPtr, (void*)colorData->data,
                              dracoMesh->numVertices * elementSize);
-        Debug.Log("Decoded mesh colors.");
+        Profiler.EndSample();
+        Profiler.BeginSample("CreateUnityMesh.ReleaseColors");
         ReleaseDracoData(&colorData);
         ReleaseDracoAttribute(&attr);
+        Profiler.EndSample();
       }
     }
 
@@ -277,6 +294,7 @@ public unsafe class DracoMeshLoader
     if (GetAttributeByType(dracoMesh, AttributeType.GENERIC, 0, &attr)) {
       DracoData* genericData = null;
       if (GetAttributeData(dracoMesh, attr, &genericData)) {
+        Profiler.BeginSample("CreateUnityMesh.CopyGeneric");
         elementSize =
             DataTypeSize((DracoMeshLoader.DataType)genericData->dataType) *
                 attr->numComponents;
@@ -284,18 +302,15 @@ public unsafe class DracoMeshLoader
         var newGenericPtr = UnsafeUtility.AddressOf(ref newGenerics[0]);
         UnsafeUtility.MemCpy(newGenericPtr, (void*)genericData->data,
                              dracoMesh->numVertices * elementSize);
-        Debug.Log("Decoded mesh generic data.");
+        Profiler.EndSample();
+        Profiler.BeginSample("CreateUnityMesh.ReleaseGeneric");
         ReleaseDracoData(&genericData);
         ReleaseDracoAttribute(&attr);
+        Profiler.EndSample();
       }
     }
 
-    float copyDecodedDataTimeMilli =
-        (Time.realtimeSinceStartup - startTime) * 1000.0f;
-    Debug.Log("copyDecodedDataTimeMilli: " +
-              copyDecodedDataTimeMilli.ToString());
-
-    startTime = Time.realtimeSinceStartup;
+    Profiler.BeginSample("CreateUnityMesh.CreateMesh");
     Mesh mesh = new Mesh();
 
 #if UNITY_2017_3_OR_NEWER
@@ -317,15 +332,14 @@ public unsafe class DracoMeshLoader
       mesh.normals = newNormals;
     } else {
       mesh.RecalculateNormals();
-      Debug.Log("Mesh doesn't have normals, recomputed.");
+      // Debug.Log("Mesh doesn't have normals, recomputed.");
     }
     if (newColors != null) {
       mesh.colors = newColors;
     }
 
-    float convertTimeMilli =
-        (Time.realtimeSinceStartup - startTime) * 1000.0f;
-    Debug.Log("convertTimeMilli: " + convertTimeMilli.ToString());
+    Profiler.EndSample();
+    Profiler.EndSample();
     return mesh;
   }
 
