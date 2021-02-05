@@ -16,6 +16,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
@@ -88,7 +89,7 @@ public unsafe class DracoMeshLoader
   // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
   // must be null. The returned mesh must released with ReleaseDracoMesh.
   [DllImport ("dracodec_unity")] private static extern int DecodeDracoMesh(
-      byte[] buffer, int length, DracoMesh**mesh);
+      byte* buffer, int length, DracoMesh**mesh);
 
   // Returns the DracoAttribute at index in mesh. On input, attribute must be
   // null. The returned attr must be released with ReleaseDracoAttribute.
@@ -138,12 +139,31 @@ public unsafe class DracoMeshLoader
 
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
+  public unsafe int ConvertDracoMeshToUnity(NativeArray<byte> encodedData,
+    ref List<Mesh> meshes) {
+    var encodedDataPtr = (byte*) encodedData.GetUnsafeReadOnlyPtr();
+    return ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, ref meshes);
+  }
+  
+  // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
+  // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
   public unsafe int ConvertDracoMeshToUnity(byte[] encodedData,
-                                            ref List<Mesh> meshes)
+    ref List<Mesh> meshes) {
+    var encodedDataPtr = (byte*) UnsafeUtility.PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
+    var result = ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, ref meshes);
+    UnsafeUtility.ReleaseGCObject(gcHandle);
+    return result;
+  }
+  
+  // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
+  // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
+  unsafe int ConvertDracoMeshToUnity(byte* encodedData, int size,
+    ref List<Mesh> meshes)
   {
+
     float startTime = Time.realtimeSinceStartup;
     DracoMesh *mesh = null;
-    if (DecodeDracoMesh(encodedData, encodedData.Length, &mesh) <= 0) {
+    if (DecodeDracoMesh(encodedData, size, &mesh) <= 0) {
       Debug.Log("Failed: Decoding error.");
       return -1;
     }
