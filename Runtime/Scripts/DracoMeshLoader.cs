@@ -15,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -360,6 +361,8 @@ public unsafe class DracoMeshLoader
     ReleaseDracoData(&indicesData);
     Profiler.EndSample(); // CreateUnityMesh.ReleaseIndices
 
+    var jobHandles = new JobHandle[attributes.Count];
+    int jobIndex = 0;
     foreach (var pair in attributes) {
       var map = pair.Value;
       if (streamMemberCount[map.stream] > 1) {
@@ -369,9 +372,7 @@ public unsafe class DracoMeshLoader
           stride=streamStrides[map.stream],
           dstPtr=vDataPtr[map.stream]+map.offset
         };
-        // TODO: Jobify!
-        // job.Schedule();
-        job.Run();
+        jobHandles[jobIndex] = job.Schedule();
       }
       else {
         var job = new GetDracoDataJob() {
@@ -379,12 +380,19 @@ public unsafe class DracoMeshLoader
           attribute=map.dracoAttribute,
           dstPtr=vDataPtr[map.stream]+map.offset
         };
-        // TODO: Jobify!
-        // job.Schedule();
-        job.Run();
+        jobHandles[jobIndex] = job.Schedule();
       }
+
+      jobIndex++;
     }
 
+    foreach (var jobHandle in jobHandles) {
+      // while (!jobHandle.IsCompleted) {
+      //   await Task.Yield();
+      // }
+      jobHandle.Complete();
+    }
+    
     Profiler.BeginSample("CreateUnityMesh.CreateMesh");
     var mesh = new Mesh();
     
