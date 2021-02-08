@@ -203,7 +203,33 @@ public unsafe class DracoMeshLoader
       dracoAttribute = null;
     }
   }
-  
+
+  struct GetDracoDataJob : IJob {
+    [ReadOnly]
+    [NativeDisableUnsafePtrRestriction]
+    public DracoMesh* dracoMesh;
+
+    [ReadOnly]
+    [NativeDisableUnsafePtrRestriction]
+    public DracoAttribute* attribute;
+    
+    [WriteOnly]
+    [NativeDisableUnsafePtrRestriction]
+    public byte* dstPtr;
+    
+    public void Execute() {
+      Profiler.BeginSample($"CreateUnityMesh.CopyVertexData{(AttributeType)attribute->attributeType}");
+      DracoData* data = null;
+      GetAttributeData(dracoMesh, attribute, &data);
+      var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
+      UnsafeUtility.MemCpy(dstPtr, (void*)data->data, elementSize*dracoMesh->numVertices);
+      Profiler.EndSample();
+      Profiler.BeginSample("CreateUnityMesh.ReleaseData");
+      ReleaseDracoData(&data);
+      Profiler.EndSample();
+    }
+  }
+
   struct GetDracoDataInterleavedJob : IJob {
 
     [ReadOnly]
@@ -289,7 +315,9 @@ public unsafe class DracoMeshLoader
     const int maxStreamCount = 4;
 
     var streamStrides = new int[maxStreamCount];
-
+    
+    var streamMemberCount = new int[maxStreamCount];
+    
     int streamIndex = 0;
     foreach (var pair in attributes) {
       // Naive stream assignment:
@@ -301,6 +329,7 @@ public unsafe class DracoMeshLoader
       attributeMap.offset = streamStrides[streamIndex];
       attributeMap.stream = streamIndex;
       streamStrides[streamIndex] += elementSize;
+      streamMemberCount[streamIndex]++;
       if (streamIndex < maxStreamCount) {
         streamIndex++;
       }
@@ -333,15 +362,27 @@ public unsafe class DracoMeshLoader
 
     foreach (var pair in attributes) {
       var map = pair.Value;
-      var job = new GetDracoDataInterleavedJob() {
-        dracoMesh=dracoMesh,
-        attribute=map.dracoAttribute,
-        stride=streamStrides[map.stream],
-        dstPtr=vDataPtr[map.stream]+map.offset
-      };
-      // TODO: Jobify!
-      // job.Schedule();
-      job.Run();
+      if (streamMemberCount[map.stream] > 1) {
+        var job = new GetDracoDataInterleavedJob() {
+          dracoMesh=dracoMesh,
+          attribute=map.dracoAttribute,
+          stride=streamStrides[map.stream],
+          dstPtr=vDataPtr[map.stream]+map.offset
+        };
+        // TODO: Jobify!
+        // job.Schedule();
+        job.Run();
+      }
+      else {
+        var job = new GetDracoDataJob() {
+          dracoMesh=dracoMesh,
+          attribute=map.dracoAttribute,
+          dstPtr=vDataPtr[map.stream]+map.offset
+        };
+        // TODO: Jobify!
+        // job.Schedule();
+        job.Run();
+      }
     }
 
     Profiler.BeginSample("CreateUnityMesh.CreateMesh");
