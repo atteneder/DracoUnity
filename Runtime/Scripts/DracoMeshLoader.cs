@@ -13,13 +13,14 @@
 // limitations under the License.
 //
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Profiling;
+using UnityEngine.Rendering;
 
 public unsafe class DracoMeshLoader
 {
@@ -179,170 +180,205 @@ public unsafe class DracoMeshLoader
     Profiler.EndSample();
     return numFaces;
   }
-
-  // Creates a Unity mesh from the decoded Draco mesh.
-  public unsafe Mesh CreateUnityMesh(DracoMesh *dracoMesh)
-  {
+  
+  class AttributeMap {
+    public DracoAttribute* dracoAttribute;
+    public VertexAttributeFormat format;
+    public int offset;
+    public int stream;
     
+    public AttributeMap (DracoAttribute* dracoAttribute, VertexAttributeFormat format) {
+      this.dracoAttribute = dracoAttribute;
+      this.format = format;
+      offset = 0;
+      stream = 0;
+    }
+
+    public int numComponents => dracoAttribute->numComponents;
+    public int elementSize => DataTypeSize((DataType)dracoAttribute->dataType) * dracoAttribute->numComponents;
+
+    public void Dispose() {
+      var tmp = dracoAttribute;
+      ReleaseDracoAttribute(&tmp);
+      dracoAttribute = null;
+    }
+  }
+  
+  struct GetDracoDataInterleavedJob : IJob {
+
+    [ReadOnly]
+    [NativeDisableUnsafePtrRestriction]
+    public DracoMesh* dracoMesh;
+
+    [ReadOnly]
+    [NativeDisableUnsafePtrRestriction]
+    public DracoAttribute* attribute;
+    
+    [ReadOnly]
+    public int stride;
+    
+    [WriteOnly]
+    [NativeDisableUnsafePtrRestriction]
+    public byte* dstPtr;
+    
+    public void Execute() {
+      Profiler.BeginSample($"CreateUnityMesh.CopyVertexData{(AttributeType)attribute->attributeType}");
+      DracoData* data = null;
+      GetAttributeData(dracoMesh, attribute, &data);
+      var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
+      for (var v = 0; v < dracoMesh->numVertices; v++) {
+        UnsafeUtility.MemCpy(dstPtr+(stride*v), ((byte*)data->data)+(elementSize*v), elementSize);
+      }
+      Profiler.EndSample();
+      Profiler.BeginSample("CreateUnityMesh.ReleaseData");
+      ReleaseDracoData(&data);
+      Profiler.EndSample();
+    }
+  }
+  
+  // Creates a Unity mesh from the decoded Draco mesh.
+  public Mesh CreateUnityMesh(DracoMesh *dracoMesh)
+  {
     Profiler.BeginSample("CreateUnityMesh");
     
     Profiler.BeginSample("CreateUnityMesh.Allocate");
-    int numFaces = dracoMesh->numFaces;
-    int[] newTriangles = new int[dracoMesh->numFaces * 3];
-    Vector3[] newVertices = new Vector3[dracoMesh->numVertices];
-    Vector2[] newUVs = null;
-    Vector3[] newNormals = null;
-    Color[] newColors = null;
-    byte[] newGenerics = null;
-    Profiler.EndSample();
+    
+    var attributes = new Dictionary<VertexAttribute,AttributeMap>(dracoMesh->numAttributes);
+    
+    void CreateAttributeMaps(AttributeType attributeType, int count) {
+      for (var i = 0; i < count; i++) {
+        var type = GetVertexAttribute(attributeType,i);
+        if (!type.HasValue) {
+#if UNITY_EDITOR
+          // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
+          Debug.LogWarning($"Unknown attribute {attributeType}!");
+#endif
+          continue;
+        }
+        if (attributes.ContainsKey(type.Value)) {
+#if UNITY_EDITOR
+          // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
+          Debug.LogWarning($"Multiple {type.Value} attributes!");
+#endif
+          continue;
+        }
+        DracoAttribute* attribute;
+        if (GetAttributeByType(dracoMesh, attributeType, i, &attribute)) {
+          var format = GetVertexAttributeFormat((DataType)attribute->dataType);
+          if (!format.HasValue) {
+            continue;
+          }
+          var map = new AttributeMap(attribute,format.Value);
+          attributes[type.Value] = map;
+        }
+        else {
+          // attributeType was not found
+          break;
+        }
+      }
+    }
+
+    CreateAttributeMaps(AttributeType.POSITION,1);
+    CreateAttributeMaps(AttributeType.NORMAL,1);
+    CreateAttributeMaps(AttributeType.COLOR,1);
+    CreateAttributeMaps(AttributeType.TEX_COORD,8);
+    
+    // TODO: If konw, query generic attributes by ID
+    // CreateAttributeMaps(AttributeType.GENERIC,2);
+
+    const int maxStreamCount = 4;
+
+    var streamStrides = new int[maxStreamCount];
+
+    int streamIndex = 0;
+    foreach (var pair in attributes) {
+      // Naive stream assignment:
+      // First 3 attributes get a dedicated stream (#1,#2 and #3 respectivly)
+      // 4th and following get assigned to stream #4
+      // TODO: Make smarter stream assignment decision
+      var attributeMap = pair.Value;
+      var elementSize = attributeMap.elementSize;
+      attributeMap.offset = streamStrides[streamIndex];
+      attributeMap.stream = streamIndex;
+      streamStrides[streamIndex] += elementSize;
+      if (streamIndex < maxStreamCount) {
+        streamIndex++;
+      }
+    }
+    int streamCount = streamIndex;
+    
+    var newIndices = new NativeArray<uint>(dracoMesh->numFaces * 3, Allocator.Temp);
+
+    var vData = new NativeArray<byte>[streamCount];
+    var vDataPtr = new byte*[streamCount];
+    for (streamIndex = 0; streamIndex < streamCount; streamIndex++) {
+      vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex]*dracoMesh->numVertices, Allocator.Temp);
+      vDataPtr[streamIndex] = (byte*) vData[streamIndex].GetUnsafePtr();
+    }
+    Profiler.EndSample(); // CreateUnityMesh.Allocate
     
     Profiler.BeginSample("CreateUnityMesh.CopyIndices");
     // Copy face indices.
+    // TODO: Jobify
     DracoData *indicesData;
     GetMeshIndices(dracoMesh, &indicesData);
-    int elementSize =
-        DataTypeSize((DracoMeshLoader.DataType)indicesData->dataType);
-    int *indices = (int*)(indicesData->data);
-    var indicesPtr = UnsafeUtility.AddressOf(ref newTriangles[0]);
-    UnsafeUtility.MemCpy(indicesPtr, indices,
-                         newTriangles.Length * elementSize);
-    Profiler.EndSample();
+    int indexSize = DataTypeSize((DataType)indicesData->dataType);
+    int *indices = (int*) indicesData->data;
+    UnsafeUtility.MemCpy(newIndices.GetUnsafePtr(), indices,
+                         newIndices.Length * indexSize);
+    Profiler.EndSample(); // CreateUnityMesh.CopyIndices
     Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
     ReleaseDracoData(&indicesData);
-    Profiler.EndSample();
+    Profiler.EndSample(); // CreateUnityMesh.ReleaseIndices
 
-    // Copy positions.
-    Profiler.BeginSample("CreateUnityMesh.CopyPositions");
-    DracoAttribute *attr = null;
-    GetAttributeByType(dracoMesh, AttributeType.POSITION, 0, &attr);
-    DracoData* posData = null;
-    GetAttributeData(dracoMesh, attr, &posData);
-    elementSize = DataTypeSize((DracoMeshLoader.DataType)posData->dataType) *
-        attr->numComponents;
-    var newVerticesPtr = UnsafeUtility.AddressOf(ref newVertices[0]);
-    UnsafeUtility.MemCpy(newVerticesPtr, (void*)posData->data,
-                         dracoMesh->numVertices * elementSize);
-    Profiler.EndSample();
-    Profiler.BeginSample("CreateUnityMesh.ReleasePositions");
-    ReleaseDracoData(&posData);
-    ReleaseDracoAttribute(&attr);
-    Profiler.EndSample();
-
-    // Copy normals.
-    if (GetAttributeByType(dracoMesh, AttributeType.NORMAL, 0, &attr)) {
-      DracoData* normData = null;
-      if (GetAttributeData(dracoMesh, attr, &normData)) {
-        Profiler.BeginSample("CreateUnityMesh.CopyNormals");
-        elementSize =
-            DataTypeSize((DracoMeshLoader.DataType)normData->dataType) *
-                attr->numComponents;
-        newNormals = new Vector3[dracoMesh->numVertices];
-        var newNormalsPtr = UnsafeUtility.AddressOf(ref newNormals[0]);
-        UnsafeUtility.MemCpy(newNormalsPtr, (void*)normData->data,
-                             dracoMesh->numVertices * elementSize);
-        Profiler.EndSample();
-        Profiler.BeginSample("CreateUnityMesh.ReleaseNormals");
-        ReleaseDracoData(&normData);
-        ReleaseDracoAttribute(&attr);
-        Profiler.EndSample();
-      }
-    }
-
-    // Copy texture coordinates.
-    if (GetAttributeByType(dracoMesh, AttributeType.TEX_COORD, 0, &attr)) {
-      DracoData* texData = null;
-      if (GetAttributeData(dracoMesh, attr, &texData)) {
-        Profiler.BeginSample("CreateUnityMesh.CopyTexCoords");
-        elementSize =
-            DataTypeSize((DracoMeshLoader.DataType)texData->dataType) *
-            attr->numComponents;
-        newUVs = new Vector2[dracoMesh->numVertices];
-        var newUVsPtr = UnsafeUtility.AddressOf(ref newUVs[0]);
-        UnsafeUtility.MemCpy(newUVsPtr, (void*)texData->data,
-                             dracoMesh->numVertices * elementSize);
-        Profiler.EndSample();
-        Profiler.BeginSample("CreateUnityMesh.ReleaseTexCoords");
-        ReleaseDracoData(&texData);
-        ReleaseDracoAttribute(&attr);
-        Profiler.EndSample();
-      }
-    }
-
-    // Copy colors.
-    if (GetAttributeByType(dracoMesh, AttributeType.COLOR, 0, &attr)) {
-      DracoData* colorData = null;
-      if (GetAttributeData(dracoMesh, attr, &colorData)) {
-        Profiler.BeginSample("CreateUnityMesh.CopyColors");
-        elementSize =
-            DataTypeSize((DracoMeshLoader.DataType)colorData->dataType) *
-            attr->numComponents;
-        newColors = new Color[dracoMesh->numVertices];
-        var newColorsPtr = UnsafeUtility.AddressOf(ref newColors[0]);
-        UnsafeUtility.MemCpy(newColorsPtr, (void*)colorData->data,
-                             dracoMesh->numVertices * elementSize);
-        Profiler.EndSample();
-        Profiler.BeginSample("CreateUnityMesh.ReleaseColors");
-        ReleaseDracoData(&colorData);
-        ReleaseDracoAttribute(&attr);
-        Profiler.EndSample();
-      }
-    }
-
-    // Copy generic data. This script does not do anyhting with the generic
-    // data.
-    if (GetAttributeByType(dracoMesh, AttributeType.GENERIC, 0, &attr)) {
-      DracoData* genericData = null;
-      if (GetAttributeData(dracoMesh, attr, &genericData)) {
-        Profiler.BeginSample("CreateUnityMesh.CopyGeneric");
-        elementSize =
-            DataTypeSize((DracoMeshLoader.DataType)genericData->dataType) *
-                attr->numComponents;
-        newGenerics = new byte[dracoMesh->numVertices * elementSize];
-        var newGenericPtr = UnsafeUtility.AddressOf(ref newGenerics[0]);
-        UnsafeUtility.MemCpy(newGenericPtr, (void*)genericData->data,
-                             dracoMesh->numVertices * elementSize);
-        Profiler.EndSample();
-        Profiler.BeginSample("CreateUnityMesh.ReleaseGeneric");
-        ReleaseDracoData(&genericData);
-        ReleaseDracoAttribute(&attr);
-        Profiler.EndSample();
-      }
+    foreach (var pair in attributes) {
+      var map = pair.Value;
+      var job = new GetDracoDataInterleavedJob() {
+        dracoMesh=dracoMesh,
+        attribute=map.dracoAttribute,
+        stride=streamStrides[map.stream],
+        dstPtr=vDataPtr[map.stream]+map.offset
+      };
+      // TODO: Jobify!
+      // job.Schedule();
+      job.Run();
     }
 
     Profiler.BeginSample("CreateUnityMesh.CreateMesh");
-    Mesh mesh = new Mesh();
-
-#if UNITY_2017_3_OR_NEWER
-    mesh.indexFormat = (newVertices.Length > System.UInt16.MaxValue)
-        ? UnityEngine.Rendering.IndexFormat.UInt32
-        : UnityEngine.Rendering.IndexFormat.UInt16;
-#else
-    if (newVertices.Length > System.UInt16.MaxValue) {
-      throw new System.Exception("Draco meshes with more than 65535 vertices are only supported from Unity 2017.3 onwards.");
-    }
-#endif
-
-    mesh.vertices = newVertices;
-    mesh.SetTriangles(newTriangles, 0, true);
-    if (newUVs != null) {
-      mesh.uv = newUVs;
-    }
-    if (newNormals != null) {
-      mesh.normals = newNormals;
-    } else {
-      mesh.RecalculateNormals();
-      // Debug.Log("Mesh doesn't have normals, recomputed.");
-    }
-    if (newColors != null) {
-      mesh.colors = newColors;
+    var mesh = new Mesh();
+    
+    mesh.SetIndexBufferParams(newIndices.Length,IndexFormat.UInt32);
+    
+    var vertexParams = new List<VertexAttributeDescriptor>(dracoMesh->numAttributes);
+    foreach (var pair in attributes) {
+      var map = pair.Value;
+      vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents,map.stream));
+      map.Dispose();
     }
 
-    Profiler.EndSample();
-    Profiler.EndSample();
+    const MeshUpdateFlags flags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+    
+    // TODO: perform normal/tangent calculations if required
+    // mesh.RecalculateNormals();
+    // mesh.RecalculateTangents();
+    
+    mesh.SetVertexBufferParams(dracoMesh->numVertices,vertexParams.ToArray());
+
+    for (streamIndex = 0; streamIndex <  streamCount; streamIndex++) {
+      mesh.SetVertexBufferData(vData[streamIndex],0,0,vData[streamIndex].Length,streamIndex,flags);
+    }
+    
+    mesh.SetIndexBufferData(newIndices,0,0,newIndices.Length);
+    mesh.subMeshCount = 1;
+    
+    mesh.SetSubMesh(0,new SubMeshDescriptor(0,newIndices.Length), flags );
+
+    Profiler.EndSample(); // CreateUnityMesh.CreateMesh
+    Profiler.EndSample(); // CreateUnityMesh
     return mesh;
   }
 
-  private int DataTypeSize(DataType dt) {
+  static int DataTypeSize(DataType dt) {
     switch (dt) {
       case DataType.DT_INT8:
       case DataType.DT_UINT8:
@@ -364,6 +400,52 @@ public unsafe class DracoMeshLoader
         return 1;
       default:
         return -1;
+    }
+
+  }
+  
+  VertexAttributeFormat? GetVertexAttributeFormat(DataType inputType) {
+    switch (inputType) {
+      case DataType.DT_INT8:
+        return VertexAttributeFormat.SInt8;
+      case DataType.DT_UINT8:
+        return VertexAttributeFormat.UInt8;
+      case DataType.DT_INT16:
+        return VertexAttributeFormat.SInt16;
+      case DataType.DT_UINT16:
+        return VertexAttributeFormat.UInt16;
+      case DataType.DT_INT32:
+        return VertexAttributeFormat.SInt32;
+      case DataType.DT_UINT32:
+        return VertexAttributeFormat.UInt32;
+      case DataType.DT_FLOAT32:
+        return VertexAttributeFormat.Float32;
+      // Not supported by Unity
+      // TODO: convert to supported types
+      // case DataType.DT_INT64:
+      // case DataType.DT_UINT64:
+      // case DataType.DT_FLOAT64:
+      // case DataType.DT_BOOL:
+      default:
+        return null;
+    }
+  }
+
+  VertexAttribute? GetVertexAttribute(AttributeType inputType, int index=0) {
+    switch (inputType) {
+      case AttributeType.POSITION:
+        return VertexAttribute.Position;
+      case AttributeType.NORMAL:
+        return VertexAttribute.Normal;
+      case AttributeType.COLOR:
+        return VertexAttribute.Color;
+      case AttributeType.TEX_COORD:
+        return (VertexAttribute) ((int)VertexAttribute.TexCoord0+index);
+      // case AttributeType.GENERIC:
+      //   // TODO: map generic to possible candidates (BlendWeights, BlendIndices)
+      //   break;
+      default:
+        return null;
     }
   }
 }
