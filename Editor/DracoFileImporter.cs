@@ -13,8 +13,6 @@
 // limitations under the License.
 //
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -52,8 +50,7 @@ public class DracoFileImporter : AssetPostprocessor {
         newAsset.AddComponent<MeshRenderer>();
         meshFilter.mesh = UnityEngine.Object.Instantiate(mesh);
         newAsset.transform.parent = newAsset.transform;
-        
-        PrefabUtility.CreatePrefab(Path.Combine(dir, fileName + ".prefab"), newAsset);
+        PrefabUtility.SaveAsPrefabAsset(newAsset, Path.Combine(dir, fileName + ".prefab"));
       } else {
         // TODO: Throw exception?
         Debug.Log("Error: Decoding Draco file failed.");
