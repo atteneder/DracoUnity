@@ -118,24 +118,17 @@ namespace Draco {
             Profiler.EndSample(); // CreateUnityMesh.Allocate
         }
 
-        public void CopyIndices() {
-            Profiler.BeginSample("CreateUnityMesh.CopyIndices");
-            // Copy face indices.
-            // TODO: Jobify
-            DracoData* dracoIndices;
-            GetMeshIndices(dracoMesh, &dracoIndices);
-            int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
-            int* indicesData = (int*)dracoIndices->data;
-            UnsafeUtility.MemCpy(indices.GetUnsafePtr(), indicesData, indices.Length * indexSize);
-            Profiler.EndSample(); // CreateUnityMesh.CopyIndices
-            Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
-            ReleaseDracoData(&dracoIndices);
-            Profiler.EndSample(); // CreateUnityMesh.ReleaseIndices
-        }
-
         public JobHandle[] StartJobs() {
-            var jobHandles = new JobHandle[attributes.Count];
+            var jobHandles = new JobHandle[attributes.Count+1];
             int jobIndex = 0;
+
+            var indicesJob = new GetDracoIndicesJob() {
+                dracoMesh = dracoMesh,
+                indices = indices
+            };
+            jobHandles[jobIndex] = indicesJob.Schedule();
+            jobIndex++;
+
             foreach (var pair in attributes) {
                 var map = pair.Value;
                 if (streamMemberCount[map.stream] > 1) {
@@ -161,7 +154,9 @@ namespace Draco {
         }
 
         public Mesh CreateMesh() {
-            Profiler.BeginSample("CreateUnityMesh.CreateMesh");
+            
+            Profiler.BeginSample("CreateMesh");
+            Profiler.BeginSample("MeshAssign");
             var mesh = new Mesh();
             mesh.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
             var vertexParams = new List<VertexAttributeDescriptor>(dracoMesh->numAttributes);
@@ -196,13 +191,16 @@ namespace Draco {
             fixed (DracoMesh** dracoMeshPtr = &dracoMesh) {
                 ReleaseDracoMesh(dracoMeshPtr);
             }
-
+            Profiler.EndSample();
+            
+            Profiler.BeginSample("Dispose");
+            indices.Dispose();
             foreach (var nativeArray in vData) {
                 nativeArray.Dispose();
             }
-            indices.Dispose();
             Profiler.EndSample();
-
+            Profiler.EndSample();
+            
             return mesh;
         }
       
@@ -343,6 +341,28 @@ namespace Draco {
                 if (decodeDracoMesh <= 0) {
                     dracoMesh[0] = IntPtr.Zero;
                 }
+            }
+        }
+        
+        struct GetDracoIndicesJob : IJob {
+            
+            [ReadOnly]
+            [NativeDisableUnsafePtrRestriction]
+            public DracoMesh* dracoMesh;
+        
+            [WriteOnly]
+            public NativeArray<uint> indices;
+
+            public void Execute() {
+                Profiler.BeginSample("CreateUnityMesh.CopyIndices");
+                DracoData* dracoIndices;
+                GetMeshIndices(dracoMesh, &dracoIndices);
+                int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
+                int* indicesData = (int*)dracoIndices->data;
+                UnsafeUtility.MemCpy(indices.GetUnsafePtr(), indicesData, indices.Length * indexSize);
+                Profiler.EndSample(); // CreateUnityMesh.CopyIndices
+                Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
+                ReleaseDracoData(&dracoIndices);
             }
         }
 

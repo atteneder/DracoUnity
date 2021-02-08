@@ -57,7 +57,6 @@ namespace Draco {
             }
             
             dracoNative.Allocate();
-            dracoNative.CopyIndices();
             var jobHandles = dracoNative.StartJobs();
             foreach (var jobHandle in jobHandles) {
                 while (!jobHandle.IsCompleted) {
