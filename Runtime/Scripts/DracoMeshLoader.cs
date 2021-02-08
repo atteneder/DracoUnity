@@ -46,9 +46,17 @@ namespace Draco {
 
         async Task<Mesh> ConvertDracoMeshToUnity(IntPtr encodedData, int size) {
             var dracoNative = new DracoNative();
-            if (!dracoNative.Init(encodedData, size)) {
+            
+            var decodeJobHandle = dracoNative.Init(encodedData, size);
+            while (!decodeJobHandle.IsCompleted) {
+                await Task.Yield();
+            }
+            decodeJobHandle.Complete();
+            if (!dracoNative.CheckDecodeResult()) {
                 return null;
             }
+            
+            dracoNative.Allocate();
             dracoNative.CopyIndices();
             var jobHandles = dracoNative.StartJobs();
             foreach (var jobHandle in jobHandles) {

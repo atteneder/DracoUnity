@@ -19,21 +19,30 @@ namespace Draco {
         int streamCount;
         int[] streamStrides;
         int[] streamMemberCount;
-      
+
+        NativeArray<IntPtr> decodeJobResult;
         NativeArray<uint> indices;
         NativeArray<byte>[] vData;
         byte*[] vDataPtr;
 
-        public bool Init(IntPtr encodedData, int size) {
-            int decodeDracoMesh;
-            fixed (DracoMesh** dracoMeshPtr = &dracoMesh) {
-                decodeDracoMesh = DecodeDracoMesh((byte*)encodedData, size, dracoMeshPtr);
-            }
-            if (decodeDracoMesh <= 0) {
-                Debug.LogError("Failed: Decoding error.");
-                return false;
-            }
+        public JobHandle Init(IntPtr encodedData, int size) {
+            decodeJobResult = new NativeArray<IntPtr>(1, Allocator.Persistent);
+            var decodeJob = new DecodeJob() {
+                encodedData = (byte*)encodedData,
+                size = size,
+                dracoMesh = decodeJobResult
+            };
+            return decodeJob.Schedule();
+        }
+
+        public bool CheckDecodeResult() {
+            dracoMesh = (DracoMesh*) decodeJobResult[0];
+            decodeJobResult.Dispose();
+            return dracoMesh != null;
+        }
         
+        public void Allocate() {
+
             Profiler.BeginSample("CreateUnityMesh.Allocate");
             attributes = new Dictionary<VertexAttribute, AttributeMap>(dracoMesh->numAttributes);
 
@@ -107,8 +116,6 @@ namespace Draco {
                 vDataPtr[streamIndex] = (byte*)vData[streamIndex].GetUnsafePtr();
             }
             Profiler.EndSample(); // CreateUnityMesh.Allocate
-        
-            return true;
         }
 
         public void CopyIndices() {
@@ -317,6 +324,25 @@ namespace Draco {
                 var tmp = dracoAttribute;
                 ReleaseDracoAttribute(&tmp);
                 dracoAttribute = null;
+            }
+        }
+
+        struct DecodeJob : IJob {
+            
+            [ReadOnly]
+            [NativeDisableUnsafePtrRestriction]
+            public byte* encodedData;
+            public int size;
+
+            public NativeArray<IntPtr> dracoMesh;
+
+            public void Execute() {
+                int decodeDracoMesh;
+                DracoMesh** dracoMeshPtr = (DracoMesh**) dracoMesh.GetUnsafePtr();
+                decodeDracoMesh = DecodeDracoMesh(encodedData, size, dracoMeshPtr);
+                if (decodeDracoMesh <= 0) {
+                    dracoMesh[0] = IntPtr.Zero;
+                }
             }
         }
 
