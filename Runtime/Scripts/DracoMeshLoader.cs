@@ -157,23 +157,154 @@ public unsafe class DracoMeshLoader
   
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  Mesh ConvertDracoMeshToUnity(byte* encodedData, int size)
-  {
+  Mesh ConvertDracoMeshToUnity(byte* encodedData, int size) {
     Profiler.BeginSample("DecodeDracoMesh");
-    DracoMesh *mesh = null;
-    var decodeDracoMesh = DecodeDracoMesh(encodedData, size, &mesh);
+    DracoMesh* dracoMesh = null;
+    var decodeDracoMesh = DecodeDracoMesh(encodedData, size, &dracoMesh);
     Profiler.EndSample();
     if (decodeDracoMesh <= 0) {
       Debug.LogError("Failed: Decoding error.");
       return null;
     }
-    
-    var unityMesh = CreateUnityMesh(mesh);
-    
-    Profiler.BeginSample("ReleaseDracoMesh");
-    ReleaseDracoMesh(&mesh);
-    Profiler.EndSample();
 
+    Profiler.BeginSample("CreateUnityMesh");
+    Profiler.BeginSample("CreateUnityMesh.Allocate");
+    var attributes = new Dictionary<VertexAttribute, AttributeMap>(dracoMesh->numAttributes);
+
+    void CreateAttributeMaps(AttributeType attributeType, int count, DracoMesh* draco) {
+      for (var i = 0; i < count; i++) {
+        var type = GetVertexAttribute(attributeType, i);
+        if (!type.HasValue) {
+#if UNITY_EDITOR
+
+          // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
+          Debug.LogWarning($"Unknown attribute {attributeType}!");
+#endif
+          continue;
+        }
+
+        if (attributes.ContainsKey(type.Value)) {
+#if UNITY_EDITOR
+
+          // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
+          Debug.LogWarning($"Multiple {type.Value} attributes!");
+#endif
+          continue;
+        }
+
+        DracoAttribute* attribute;
+        if (GetAttributeByType(draco, attributeType, i, &attribute)) {
+          var format = GetVertexAttributeFormat((DataType)attribute->dataType);
+          if (!format.HasValue) { continue; }
+
+          var map = new AttributeMap(attribute, format.Value);
+          attributes[type.Value] = map;
+        }
+        else {
+          // attributeType was not found
+          break;
+        }
+      }
+    }
+
+    CreateAttributeMaps(AttributeType.POSITION, 1, dracoMesh);
+    CreateAttributeMaps(AttributeType.NORMAL, 1, dracoMesh);
+    CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
+    CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
+
+    // TODO: If konw, query generic attributes by ID
+    // CreateAttributeMaps(AttributeType.GENERIC,2);
+    const int maxStreamCount = 4;
+    var streamStrides = new int[maxStreamCount];
+    var streamMemberCount = new int[maxStreamCount];
+    int streamIndex = 0;
+    foreach (var pair in attributes) {
+      // Naive stream assignment:
+      // First 3 attributes get a dedicated stream (#1,#2 and #3 respectivly)
+      // 4th and following get assigned to stream #4
+      // TODO: Make smarter stream assignment decision
+      var attributeMap = pair.Value;
+      var elementSize = attributeMap.elementSize;
+      attributeMap.offset = streamStrides[streamIndex];
+      attributeMap.stream = streamIndex;
+      streamStrides[streamIndex] += elementSize;
+      streamMemberCount[streamIndex]++;
+      if (streamIndex < maxStreamCount) { streamIndex++; }
+    }
+
+    int streamCount = streamIndex;
+    var newIndices = new NativeArray<uint>(dracoMesh->numFaces * 3, Allocator.Temp);
+    var vData = new NativeArray<byte>[streamCount];
+    var vDataPtr = new byte*[streamCount];
+    for (streamIndex = 0; streamIndex < streamCount; streamIndex++) {
+      vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex] * dracoMesh->numVertices, Allocator.Temp);
+      vDataPtr[streamIndex] = (byte*)vData[streamIndex].GetUnsafePtr();
+    }
+
+    Profiler.EndSample(); // CreateUnityMesh.Allocate
+    Profiler.BeginSample("CreateUnityMesh.CopyIndices");
+
+    // Copy face indices.
+    // TODO: Jobify
+    DracoData* indicesData;
+    GetMeshIndices(dracoMesh, &indicesData);
+    int indexSize = DataTypeSize((DataType)indicesData->dataType);
+    int* indices = (int*)indicesData->data;
+    UnsafeUtility.MemCpy(newIndices.GetUnsafePtr(), indices, newIndices.Length * indexSize);
+    Profiler.EndSample(); // CreateUnityMesh.CopyIndices
+    Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
+    ReleaseDracoData(&indicesData);
+    Profiler.EndSample(); // CreateUnityMesh.ReleaseIndices
+    var jobHandles = new JobHandle[attributes.Count];
+    int jobIndex = 0;
+    foreach (var pair in attributes) {
+      var map = pair.Value;
+      if (streamMemberCount[map.stream] > 1) {
+        var job = new GetDracoDataInterleavedJob() { dracoMesh = dracoMesh, attribute = map.dracoAttribute, stride = streamStrides[map.stream], dstPtr = vDataPtr[map.stream] + map.offset };
+        jobHandles[jobIndex] = job.Schedule();
+      }
+      else {
+        var job = new GetDracoDataJob() { dracoMesh = dracoMesh, attribute = map.dracoAttribute, dstPtr = vDataPtr[map.stream] + map.offset };
+        jobHandles[jobIndex] = job.Schedule();
+      }
+
+      jobIndex++;
+    }
+
+    foreach (var jobHandle in jobHandles) {
+      // while (!jobHandle.IsCompleted) {
+      //   await Task.Yield();
+      // }
+      jobHandle.Complete();
+    }
+
+    Profiler.BeginSample("CreateUnityMesh.CreateMesh");
+    var unit = new Mesh();
+    unit.SetIndexBufferParams(newIndices.Length, IndexFormat.UInt32);
+    var vertexParams = new List<VertexAttributeDescriptor>(dracoMesh->numAttributes);
+    foreach (var pair in attributes) {
+      var map = pair.Value;
+      vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents, map.stream));
+      map.Dispose();
+    }
+
+    const MeshUpdateFlags flags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
+
+    // TODO: perform normal/tangent calculations if required
+    // mesh.RecalculateNormals();
+    // mesh.RecalculateTangents();
+    unit.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
+    for (streamIndex = 0; streamIndex < streamCount; streamIndex++) { unit.SetVertexBufferData(vData[streamIndex], 0, 0, vData[streamIndex].Length, streamIndex, flags); }
+
+    unit.SetIndexBufferData(newIndices, 0, 0, newIndices.Length);
+    unit.subMeshCount = 1;
+    unit.SetSubMesh(0, new SubMeshDescriptor(0, newIndices.Length), flags);
+    Profiler.EndSample(); // CreateUnityMesh.CreateMesh
+    Profiler.EndSample(); // CreateUnityMesh
+    var unityMesh = unit;
+    Profiler.BeginSample("ReleaseDracoMesh");
+    ReleaseDracoMesh(&dracoMesh);
+    Profiler.EndSample();
     return unityMesh;
   }
   
@@ -258,170 +389,6 @@ public unsafe class DracoMeshLoader
     }
   }
   
-  // Creates a Unity mesh from the decoded Draco mesh.
-  public Mesh CreateUnityMesh(DracoMesh *dracoMesh)
-  {
-    Profiler.BeginSample("CreateUnityMesh");
-    
-    Profiler.BeginSample("CreateUnityMesh.Allocate");
-    
-    var attributes = new Dictionary<VertexAttribute,AttributeMap>(dracoMesh->numAttributes);
-    
-    void CreateAttributeMaps(AttributeType attributeType, int count) {
-      for (var i = 0; i < count; i++) {
-        var type = GetVertexAttribute(attributeType,i);
-        if (!type.HasValue) {
-#if UNITY_EDITOR
-          // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
-          Debug.LogWarning($"Unknown attribute {attributeType}!");
-#endif
-          continue;
-        }
-        if (attributes.ContainsKey(type.Value)) {
-#if UNITY_EDITOR
-          // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
-          Debug.LogWarning($"Multiple {type.Value} attributes!");
-#endif
-          continue;
-        }
-        DracoAttribute* attribute;
-        if (GetAttributeByType(dracoMesh, attributeType, i, &attribute)) {
-          var format = GetVertexAttributeFormat((DataType)attribute->dataType);
-          if (!format.HasValue) {
-            continue;
-          }
-          var map = new AttributeMap(attribute,format.Value);
-          attributes[type.Value] = map;
-        }
-        else {
-          // attributeType was not found
-          break;
-        }
-      }
-    }
-
-    CreateAttributeMaps(AttributeType.POSITION,1);
-    CreateAttributeMaps(AttributeType.NORMAL,1);
-    CreateAttributeMaps(AttributeType.COLOR,1);
-    CreateAttributeMaps(AttributeType.TEX_COORD,8);
-    
-    // TODO: If konw, query generic attributes by ID
-    // CreateAttributeMaps(AttributeType.GENERIC,2);
-
-    const int maxStreamCount = 4;
-
-    var streamStrides = new int[maxStreamCount];
-    
-    var streamMemberCount = new int[maxStreamCount];
-    
-    int streamIndex = 0;
-    foreach (var pair in attributes) {
-      // Naive stream assignment:
-      // First 3 attributes get a dedicated stream (#1,#2 and #3 respectivly)
-      // 4th and following get assigned to stream #4
-      // TODO: Make smarter stream assignment decision
-      var attributeMap = pair.Value;
-      var elementSize = attributeMap.elementSize;
-      attributeMap.offset = streamStrides[streamIndex];
-      attributeMap.stream = streamIndex;
-      streamStrides[streamIndex] += elementSize;
-      streamMemberCount[streamIndex]++;
-      if (streamIndex < maxStreamCount) {
-        streamIndex++;
-      }
-    }
-    int streamCount = streamIndex;
-    
-    var newIndices = new NativeArray<uint>(dracoMesh->numFaces * 3, Allocator.Temp);
-
-    var vData = new NativeArray<byte>[streamCount];
-    var vDataPtr = new byte*[streamCount];
-    for (streamIndex = 0; streamIndex < streamCount; streamIndex++) {
-      vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex]*dracoMesh->numVertices, Allocator.Temp);
-      vDataPtr[streamIndex] = (byte*) vData[streamIndex].GetUnsafePtr();
-    }
-    Profiler.EndSample(); // CreateUnityMesh.Allocate
-    
-    Profiler.BeginSample("CreateUnityMesh.CopyIndices");
-    // Copy face indices.
-    // TODO: Jobify
-    DracoData *indicesData;
-    GetMeshIndices(dracoMesh, &indicesData);
-    int indexSize = DataTypeSize((DataType)indicesData->dataType);
-    int *indices = (int*) indicesData->data;
-    UnsafeUtility.MemCpy(newIndices.GetUnsafePtr(), indices,
-                         newIndices.Length * indexSize);
-    Profiler.EndSample(); // CreateUnityMesh.CopyIndices
-    Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
-    ReleaseDracoData(&indicesData);
-    Profiler.EndSample(); // CreateUnityMesh.ReleaseIndices
-
-    var jobHandles = new JobHandle[attributes.Count];
-    int jobIndex = 0;
-    foreach (var pair in attributes) {
-      var map = pair.Value;
-      if (streamMemberCount[map.stream] > 1) {
-        var job = new GetDracoDataInterleavedJob() {
-          dracoMesh=dracoMesh,
-          attribute=map.dracoAttribute,
-          stride=streamStrides[map.stream],
-          dstPtr=vDataPtr[map.stream]+map.offset
-        };
-        jobHandles[jobIndex] = job.Schedule();
-      }
-      else {
-        var job = new GetDracoDataJob() {
-          dracoMesh=dracoMesh,
-          attribute=map.dracoAttribute,
-          dstPtr=vDataPtr[map.stream]+map.offset
-        };
-        jobHandles[jobIndex] = job.Schedule();
-      }
-
-      jobIndex++;
-    }
-
-    foreach (var jobHandle in jobHandles) {
-      // while (!jobHandle.IsCompleted) {
-      //   await Task.Yield();
-      // }
-      jobHandle.Complete();
-    }
-    
-    Profiler.BeginSample("CreateUnityMesh.CreateMesh");
-    var mesh = new Mesh();
-    
-    mesh.SetIndexBufferParams(newIndices.Length,IndexFormat.UInt32);
-    
-    var vertexParams = new List<VertexAttributeDescriptor>(dracoMesh->numAttributes);
-    foreach (var pair in attributes) {
-      var map = pair.Value;
-      vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents,map.stream));
-      map.Dispose();
-    }
-
-    const MeshUpdateFlags flags = MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontValidateIndices;
-    
-    // TODO: perform normal/tangent calculations if required
-    // mesh.RecalculateNormals();
-    // mesh.RecalculateTangents();
-    
-    mesh.SetVertexBufferParams(dracoMesh->numVertices,vertexParams.ToArray());
-
-    for (streamIndex = 0; streamIndex <  streamCount; streamIndex++) {
-      mesh.SetVertexBufferData(vData[streamIndex],0,0,vData[streamIndex].Length,streamIndex,flags);
-    }
-    
-    mesh.SetIndexBufferData(newIndices,0,0,newIndices.Length);
-    mesh.subMeshCount = 1;
-    
-    mesh.SetSubMesh(0,new SubMeshDescriptor(0,newIndices.Length), flags );
-
-    Profiler.EndSample(); // CreateUnityMesh.CreateMesh
-    Profiler.EndSample(); // CreateUnityMesh
-    return mesh;
-  }
-
   static int DataTypeSize(DataType dt) {
     switch (dt) {
       case DataType.DT_INT8:
