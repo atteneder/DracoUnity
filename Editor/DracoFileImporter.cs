@@ -15,6 +15,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -27,43 +28,35 @@ public class DracoFileImporter : AssetPostprocessor {
         return;
       }
 
-      // If the original mesh exceeds the limit of number of verices, the
-      // loader will split it to a list of smaller meshes.
-      List<Mesh> meshes = new List<Mesh>();
       DracoMeshLoader dracoLoader = new DracoMeshLoader();
 
       // The decoded mesh will be named without ".drc.bytes"
-      str.LastIndexOf('/');
       int length = str.Length - ".drc.bytes".Length - str.LastIndexOf('/') - 1;
       string fileName = str.Substring(str.LastIndexOf('/') + 1, length);
 
-      int numFaces = dracoLoader.LoadMeshFromAsset(fileName + ".drc", ref meshes);
-      if (numFaces > 0) {
-        // Create mesh assets. Combine the smaller meshes to a single asset.
-        // TODO: Figure out how to combine to an unseen object as .obj files.
-        AssetDatabase.CreateAsset (meshes [0], "Assets/Resources/" + fileName + ".asset");
+      // var mesh = dracoLoader.LoadMeshFromAsset(fileName + ".drc");
+      var absolutePath = Path.Combine(Path.GetDirectoryName(Application.dataPath), str);
+      var dracoData = File.ReadAllBytes(absolutePath);
+      var mesh = dracoLoader.ConvertDracoMeshToUnity(dracoData);
+      if (mesh!=null) {
+        var dir = Path.GetDirectoryName(str);
+        var dstPath = Path.Combine(dir, fileName + ".asset");
+        AssetDatabase.CreateAsset (mesh,dstPath);
         AssetDatabase.SaveAssets ();
-        for (int i = 1; i < meshes.Count; ++i) {
-          AssetDatabase.AddObjectToAsset(meshes [i], meshes [0]);
-          AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath (meshes [i]));
-        }
 
         // Also create a Prefab for easy usage.
         GameObject newAsset = new GameObject();
         newAsset.hideFlags = HideFlags.HideInHierarchy;
-        for (int i = 0; i < meshes.Count; ++i) {
-          GameObject subObject = new GameObject();
-          subObject.hideFlags = HideFlags.HideInHierarchy;
-          subObject.AddComponent<MeshFilter>();
-          subObject.AddComponent<MeshRenderer>();
-          subObject.GetComponent<MeshFilter>().mesh =
-            UnityEngine.Object.Instantiate(meshes[i]);
-          subObject.transform.parent = newAsset.transform;
-        }
-        PrefabUtility.CreatePrefab("Assets/Resources/" + fileName + ".prefab", newAsset);
+        newAsset.hideFlags = HideFlags.HideInHierarchy;
+        var meshFilter = newAsset.AddComponent<MeshFilter>();
+        newAsset.AddComponent<MeshRenderer>();
+        meshFilter.mesh = UnityEngine.Object.Instantiate(mesh);
+        newAsset.transform.parent = newAsset.transform;
+        
+        PrefabUtility.CreatePrefab(Path.Combine(dir, fileName + ".prefab"), newAsset);
       } else {
         // TODO: Throw exception?
-        Debug.Log("Error: Decodeing Draco file failed.");
+        Debug.Log("Error: Decoding Draco file failed.");
       }
     }
   }

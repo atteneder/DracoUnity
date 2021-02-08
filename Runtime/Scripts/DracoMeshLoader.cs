@@ -123,45 +123,41 @@ public unsafe class DracoMeshLoader
   [DllImport ("dracodec_unity")] private static extern bool GetAttributeData(
       DracoMesh* mesh, DracoAttribute* attr, DracoData**data);
 
-  public int LoadMeshFromAsset(string assetName, ref List<Mesh> meshes)
+  public Mesh LoadMeshFromAsset(string assetName)
   {
-    TextAsset asset =
-        Resources.Load(assetName, typeof(TextAsset)) as TextAsset;
+    var asset = Resources.Load<TextAsset>(assetName);
     if (asset == null) {
       Debug.LogError ("Didn't load file!");
-      return -1;
+      return null;
     }
     byte[] encodedData = asset.bytes;
     // Debug.Log(encodedData.Length.ToString());
     if (encodedData.Length == 0) {
       Debug.LogError ("Didn't load encoded data!");
-      return -1;
+      return null;
     }
-    return ConvertDracoMeshToUnity(encodedData, ref meshes);
+    return ConvertDracoMeshToUnity(encodedData);
   }
 
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  public int ConvertDracoMeshToUnity(NativeArray<byte> encodedData,
-    ref List<Mesh> meshes) {
+  public Mesh ConvertDracoMeshToUnity(NativeArray<byte> encodedData) {
     var encodedDataPtr = (byte*) encodedData.GetUnsafeReadOnlyPtr();
-    return ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, ref meshes);
+    return ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length);
   }
   
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  public int ConvertDracoMeshToUnity(byte[] encodedData,
-    ref List<Mesh> meshes) {
+  public Mesh ConvertDracoMeshToUnity(byte[] encodedData) {
     var encodedDataPtr = (byte*) UnsafeUtility.PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
-    var result = ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, ref meshes);
+    var result = ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length);
     UnsafeUtility.ReleaseGCObject(gcHandle);
     return result;
   }
   
   // Decodes a Draco mesh, creates a Unity mesh from the decoded data and
   // adds the Unity mesh to meshes. encodedData is the compressed Draco mesh.
-  int ConvertDracoMeshToUnity(byte* encodedData, int size,
-    ref List<Mesh> meshes)
+  Mesh ConvertDracoMeshToUnity(byte* encodedData, int size)
   {
     Profiler.BeginSample("DecodeDracoMesh");
     DracoMesh *mesh = null;
@@ -169,17 +165,16 @@ public unsafe class DracoMeshLoader
     Profiler.EndSample();
     if (decodeDracoMesh <= 0) {
       Debug.LogError("Failed: Decoding error.");
-      return -1;
+      return null;
     }
     
-    Mesh unityMesh = CreateUnityMesh(mesh);
-    meshes.Add(unityMesh);
-
-    int numFaces = mesh->numFaces;
+    var unityMesh = CreateUnityMesh(mesh);
+    
     Profiler.BeginSample("ReleaseDracoMesh");
     ReleaseDracoMesh(&mesh);
     Profiler.EndSample();
-    return numFaces;
+
+    return unityMesh;
   }
   
   class AttributeMap {
