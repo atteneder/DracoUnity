@@ -27,9 +27,9 @@ namespace Draco {
         /// </summary>
         /// <param name="encodedData">Compressed Draco data</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
-        public Mesh ConvertDracoMeshToUnity(NativeArray<byte> encodedData) {
+        public async Task<Mesh> ConvertDracoMeshToUnity(NativeArray<byte> encodedData) {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
-            return ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length);
+            return await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length);
         }
 
         /// <summary>
@@ -37,14 +37,14 @@ namespace Draco {
         /// </summary>
         /// <param name="encodedData">Compressed Draco data</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
-        public Mesh ConvertDracoMeshToUnity(byte[] encodedData) {
+        public async Task<Mesh> ConvertDracoMeshToUnity(byte[] encodedData) {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
-            var result = ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length);
+            var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length);
             UnsafeUtility.ReleaseGCObject(gcHandle);
             return result;
         }
 
-        Mesh ConvertDracoMeshToUnity(IntPtr encodedData, int size) {
+        async Task<Mesh> ConvertDracoMeshToUnity(IntPtr encodedData, int size) {
             var dracoNative = new DracoNative();
             if (!dracoNative.Init(encodedData, size)) {
                 return null;
@@ -52,9 +52,9 @@ namespace Draco {
             dracoNative.CopyIndices();
             var jobHandles = dracoNative.StartJobs();
             foreach (var jobHandle in jobHandles) {
-                // while (!jobHandle.IsCompleted) {
-                //   await Task.Yield();
-                // }
+                while (!jobHandle.IsCompleted) {
+                  await Task.Yield();
+                }
                 jobHandle.Complete();
             }
             return dracoNative.CreateMesh();

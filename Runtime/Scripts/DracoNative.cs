@@ -99,11 +99,11 @@ namespace Draco {
             }
 
             streamCount = streamIndex;
-            indices = new NativeArray<uint>(dracoMesh->numFaces * 3, Allocator.Temp);
+            indices = new NativeArray<uint>(dracoMesh->numFaces * 3, Allocator.Persistent);
             vData = new NativeArray<byte>[streamCount];
             vDataPtr = new byte*[streamCount];
             for (streamIndex = 0; streamIndex < streamCount; streamIndex++) {
-                vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex] * dracoMesh->numVertices, Allocator.Temp);
+                vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex] * dracoMesh->numVertices, Allocator.Persistent);
                 vDataPtr[streamIndex] = (byte*)vData[streamIndex].GetUnsafePtr();
             }
             Profiler.EndSample(); // CreateUnityMesh.Allocate
@@ -132,11 +132,20 @@ namespace Draco {
             foreach (var pair in attributes) {
                 var map = pair.Value;
                 if (streamMemberCount[map.stream] > 1) {
-                    var job = new GetDracoDataInterleavedJob() { dracoMesh = dracoMesh, attribute = map.dracoAttribute, stride = streamStrides[map.stream], dstPtr = vDataPtr[map.stream] + map.offset };
+                    var job = new GetDracoDataInterleavedJob() {
+                        dracoMesh = dracoMesh,
+                        attribute = map.dracoAttribute,
+                        stride = streamStrides[map.stream],
+                        dstPtr = vDataPtr[map.stream] + map.offset
+                    };
                     jobHandles[jobIndex] = job.Schedule();
                 }
                 else {
-                    var job = new GetDracoDataJob() { dracoMesh = dracoMesh, attribute = map.dracoAttribute, dstPtr = vDataPtr[map.stream] + map.offset };
+                    var job = new GetDracoDataJob() {
+                        dracoMesh = dracoMesh,
+                        attribute = map.dracoAttribute,
+                        dstPtr = vDataPtr[map.stream] + map.offset
+                    };
                     jobHandles[jobIndex] = job.Schedule();
                 }
                 jobIndex++;
@@ -180,6 +189,11 @@ namespace Draco {
             fixed (DracoMesh** dracoMeshPtr = &dracoMesh) {
                 ReleaseDracoMesh(dracoMeshPtr);
             }
+
+            foreach (var nativeArray in vData) {
+                nativeArray.Dispose();
+            }
+            indices.Dispose();
             Profiler.EndSample();
 
             return mesh;
