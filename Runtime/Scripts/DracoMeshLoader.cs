@@ -16,6 +16,7 @@ using System;
 using System.Threading.Tasks;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 using UnityEngine;
 
 namespace Draco {
@@ -58,13 +59,14 @@ namespace Draco {
             
             dracoNative.Allocate();
             var jobHandles = dracoNative.StartJobs();
+            dracoNative.CreateMesh();
             foreach (var jobHandle in jobHandles) {
                 while (!jobHandle.IsCompleted) {
                   await Task.Yield();
                 }
                 jobHandle.Complete();
             }
-            return dracoNative.CreateMesh();
+            return dracoNative.PopulateMeshData();
         }
         
         static unsafe IntPtr GetUnsafeReadOnlyIntPtr(NativeArray<byte> encodedData) {

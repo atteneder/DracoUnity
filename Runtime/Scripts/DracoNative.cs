@@ -25,6 +25,8 @@ namespace Draco {
         NativeArray<byte>[] vData;
         byte*[] vDataPtr;
 
+        Mesh mesh;
+        
         public JobHandle Init(IntPtr encodedData, int size) {
             decodeJobResult = new NativeArray<IntPtr>(1, Allocator.Persistent);
             var decodeJob = new DecodeJob() {
@@ -115,9 +117,10 @@ namespace Draco {
                 vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex] * dracoMesh->numVertices, Allocator.Persistent);
                 vDataPtr[streamIndex] = (byte*)vData[streamIndex].GetUnsafePtr();
             }
+            
             Profiler.EndSample(); // CreateUnityMesh.Allocate
         }
-
+        
         public JobHandle[] StartJobs() {
             var jobHandles = new JobHandle[attributes.Count+1];
             int jobIndex = 0;
@@ -153,20 +156,30 @@ namespace Draco {
             return jobHandles;
         }
 
-        public Mesh CreateMesh() {
-            
+        public void CreateMesh() {
             Profiler.BeginSample("CreateMesh");
-            Profiler.BeginSample("MeshAssign");
-            var mesh = new Mesh();
+            mesh = new Mesh();
             mesh.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
             var vertexParams = new List<VertexAttributeDescriptor>(dracoMesh->numAttributes);
             foreach (var pair in attributes) {
                 var map = pair.Value;
                 vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents, map.stream));
+            }
+            mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
+            Profiler.EndSample(); // CreateUnityMesh.Mesh
+        }
+
+        public Mesh PopulateMeshData() {
+            
+            Profiler.BeginSample("PopulateMeshData");
+            
+            foreach (var map in attributes.Values) {
                 map.Dispose();
             }
             attributes = null;
 
+            Profiler.BeginSample("MeshAssign");
+            
             const MeshUpdateFlags flags =
                 MeshUpdateFlags.DontNotifyMeshUsers |
                 MeshUpdateFlags.DontRecalculateBounds |
@@ -177,7 +190,7 @@ namespace Draco {
             // mesh.RecalculateNormals();
             // mesh.RecalculateTangents();
 
-            mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
+            
             for (var streamIndex = 0; streamIndex < streamCount; streamIndex++) {
                 mesh.SetVertexBufferData(vData[streamIndex], 0, 0, vData[streamIndex].Length, streamIndex, flags);
             }
