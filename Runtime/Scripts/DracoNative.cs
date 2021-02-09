@@ -283,9 +283,14 @@ namespace Draco {
 
         // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
         // must be null. The returned mesh must released with ReleaseDracoMesh.
-        [DllImport ("dracodec_unity")] unsafe static extern int DecodeDracoMesh(
-            byte* buffer, int length, DracoMesh**mesh);
-
+        [DllImport ("dracodec_unity")] unsafe static extern int DecodeDracoMeshStep1(
+            byte* buffer, int length, DracoMesh**mesh, void**decoder, void** decoderBuffer);
+        
+        // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
+        // must be null. The returned mesh must released with ReleaseDracoMesh.
+        [DllImport ("dracodec_unity")] unsafe static extern int DecodeDracoMeshStep2(
+            DracoMesh**mesh, void* decoder, void* decoderBuffer);
+        
         // Returns the DracoAttribute at index in mesh. On input, attribute must be
         // null. The returned attr must be released with ReleaseDracoAttribute.
         [DllImport ("dracodec_unity")] unsafe static extern bool GetAttribute(
@@ -343,17 +348,34 @@ namespace Draco {
             [ReadOnly]
             [NativeDisableUnsafePtrRestriction]
             public byte* encodedData;
+
+            [ReadOnly]
             public int size;
 
             public NativeArray<IntPtr> dracoMesh;
 
             public void Execute() {
-                int decodeDracoMesh;
-                DracoMesh** dracoMeshPtr = (DracoMesh**) dracoMesh.GetUnsafePtr();
-                decodeDracoMesh = DecodeDracoMesh(encodedData, size, dracoMeshPtr);
-                if (decodeDracoMesh <= 0) {
+                DracoMesh* dracoMeshPtr;
+                DracoMesh** dracoMeshPtrPtr = &dracoMeshPtr;
+                void* decoder;
+                void* buffer;
+                Profiler.BeginSample("DecodeDracoMeshStep1");
+                var decodeResult = DecodeDracoMeshStep1(encodedData, size, dracoMeshPtrPtr, &decoder, &buffer);
+                Profiler.EndSample();
+                if (decodeResult < 0) {
                     dracoMesh[0] = IntPtr.Zero;
+                    return;
                 }
+                
+                // Debug.Log(dracoMeshPtr->numVertices);
+                Profiler.BeginSample("DecodeDracoMeshStep1");
+                decodeResult = DecodeDracoMeshStep2(dracoMeshPtrPtr, decoder, buffer);
+                Profiler.EndSample();
+                if (decodeResult <= 0) {
+                    dracoMesh[0] = IntPtr.Zero;
+                    return;
+                }
+                dracoMesh[0] = (IntPtr) dracoMeshPtr;
             }
         }
         
