@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Utilizes Advanced Mesh API
   - Two-step decoding allows to do more work of step two in threaded Jobs
 - Burst
+- Unit tests
 ### Changes
 - API is now async/await based
 
