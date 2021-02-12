@@ -417,8 +417,8 @@ namespace Draco {
                 void* decoder;
                 void* buffer;
                 var decodeResult = DecodeDracoMeshStep1(encodedData, size, dracoMeshPtrPtr, &decoder, &buffer);
+                result[0] = decodeResult;
                 if (decodeResult < 0) {
-                    result[0] = -1;
                     return;
                 }
                 dracoTempResources[meshPtrIndex] = (IntPtr) dracoMeshPtr;
