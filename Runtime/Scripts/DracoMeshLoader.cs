@@ -47,26 +47,25 @@ namespace Draco {
 
         async Task<Mesh> ConvertDracoMeshToUnity(IntPtr encodedData, int size) {
             var dracoNative = new DracoNative();
-            
-            var decodeJobHandle = dracoNative.Init(encodedData, size);
-            while (!decodeJobHandle.IsCompleted) {
-                await Task.Yield();
-            }
-            decodeJobHandle.Complete();
-            if (!dracoNative.CheckDecodeResult()) {
+            await WaitForJobHandle(dracoNative.Init(encodedData, size));
+            if (dracoNative.ErrorOccured()) {
                 return null;
             }
-            
-            dracoNative.Allocate();
-            var jobHandles = dracoNative.StartJobs();
             dracoNative.CreateMesh();
-            foreach (var jobHandle in jobHandles) {
-                while (!jobHandle.IsCompleted) {
-                  await Task.Yield();
-                }
-                jobHandle.Complete();
+            await WaitForJobHandle(dracoNative.DecodeVertexData());
+            var error = dracoNative.ErrorOccured();
+            dracoNative.DisposeDracoMesh();
+            if (error) {
+                return null;
             }
             return dracoNative.PopulateMeshData();
+        }
+
+        static async Task WaitForJobHandle(JobHandle jobHandle) {
+            while (!jobHandle.IsCompleted) {
+                await Task.Yield();
+            }
+            jobHandle.Complete();
         }
         
         static unsafe IntPtr GetUnsafeReadOnlyIntPtr(NativeArray<byte> encodedData) {

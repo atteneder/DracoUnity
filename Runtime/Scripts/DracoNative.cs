@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -26,16 +27,27 @@ using UnityEngine.Rendering;
 namespace Draco {
 
     unsafe class DracoNative {
+        
         const int maxStreamCount = 4;
-      
-        DracoMesh* dracoMesh;
-
+        
+        /// <summary>
+        /// If Draco mesh has more vertices than this value, memory is allocated persistent,
+        /// which is slower, but safe when spanning multiple frames.
+        /// </summary>
+        const int persistentDataThreshold = 5_000;
+        
+        const int meshPtrIndex = 0;
+        const int decoderPtrIndex = 1;
+        const int bufferPtrIndex = 2;
+        
         Dictionary<VertexAttribute, AttributeMap> attributes;
         int streamCount;
         int[] streamStrides;
         int[] streamMemberCount;
 
-        NativeArray<IntPtr> decodeJobResult;
+        Allocator allocator;
+        NativeArray<int> dracoDecodeResult;
+        NativeArray<IntPtr> dracoTempResources;
         NativeArray<uint> indices;
         NativeArray<byte>[] vData;
         byte*[] vDataPtr;
@@ -43,24 +55,29 @@ namespace Draco {
         Mesh mesh;
         
         public JobHandle Init(IntPtr encodedData, int size) {
-            decodeJobResult = new NativeArray<IntPtr>(1, Allocator.Persistent);
+            dracoDecodeResult = new NativeArray<int>(1, Allocator.Persistent);
+            dracoTempResources = new NativeArray<IntPtr>(3, Allocator.Persistent);
             var decodeJob = new DecodeJob() {
                 encodedData = (byte*)encodedData,
                 size = size,
-                dracoMesh = decodeJobResult
+                result = dracoDecodeResult,
+                dracoTempResources = dracoTempResources
             };
             return decodeJob.Schedule();
         }
 
-        public bool CheckDecodeResult() {
-            dracoMesh = (DracoMesh*) decodeJobResult[0];
-            decodeJobResult.Dispose();
-            return dracoMesh != null;
+        public bool ErrorOccured() {
+            return dracoDecodeResult[0] < 0;
         }
         
-        public void Allocate() {
-
-            Profiler.BeginSample("CreateUnityMesh.Allocate");
+        void AllocateIndices(DracoMesh* dracoMesh) {
+            Profiler.BeginSample("AllocateIndices");
+            indices = new NativeArray<uint>(dracoMesh->numFaces * 3, allocator, NativeArrayOptions.UninitializedMemory);
+            Profiler.EndSample(); // AllocateIndices
+        }
+        
+        void AllocateVertexBuffers(DracoMesh* dracoMesh) {
+            Profiler.BeginSample("AllocateVertexBuffers");
             attributes = new Dictionary<VertexAttribute, AttributeMap>(dracoMesh->numAttributes);
 
             void CreateAttributeMaps(AttributeType attributeType, int count, DracoMesh* draco) {
@@ -125,65 +142,94 @@ namespace Draco {
             }
 
             streamCount = streamIndex;
-            indices = new NativeArray<uint>(dracoMesh->numFaces * 3, Allocator.Persistent);
             vData = new NativeArray<byte>[streamCount];
             vDataPtr = new byte*[streamCount];
             for (streamIndex = 0; streamIndex < streamCount; streamIndex++) {
-                vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex] * dracoMesh->numVertices, Allocator.Persistent);
+                vData[streamIndex] = new NativeArray<byte>(streamStrides[streamIndex] * dracoMesh->numVertices, allocator, NativeArrayOptions.UninitializedMemory);
                 vDataPtr[streamIndex] = (byte*)vData[streamIndex].GetUnsafePtr();
             }
             
-            Profiler.EndSample(); // CreateUnityMesh.Allocate
+            Profiler.EndSample(); // AllocateVertexBuffers
         }
-        
-        public JobHandle[] StartJobs() {
-            var jobHandles = new JobHandle[attributes.Count+1];
-            int jobIndex = 0;
 
+        public JobHandle DecodeVertexData() {
+            var decodeVerticesJob = new DecodeVerticesJob() {
+                result = dracoDecodeResult,
+                dracoTempResources = dracoTempResources
+            };
+            var decodeVerticesJobHandle = decodeVerticesJob.Schedule();
+            
             var indicesJob = new GetDracoIndicesJob() {
-                dracoMesh = dracoMesh,
+                result = dracoDecodeResult,
+                dracoTempResources = dracoTempResources,
                 indices = indices
             };
-            jobHandles[jobIndex] = indicesJob.Schedule();
-            jobIndex++;
-
+            
+            NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(attributes.Count+1, allocator);
+            
+            jobHandles[0] = indicesJob.Schedule(decodeVerticesJobHandle);
+            
+            int jobIndex = 1;
             foreach (var pair in attributes) {
                 var map = pair.Value;
                 if (streamMemberCount[map.stream] > 1) {
                     var job = new GetDracoDataInterleavedJob() {
-                        dracoMesh = dracoMesh,
+                        result = dracoDecodeResult,
+                        dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
                         stride = streamStrides[map.stream],
                         dstPtr = vDataPtr[map.stream] + map.offset
                     };
-                    jobHandles[jobIndex] = job.Schedule();
+                    jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
                 }
                 else {
                     var job = new GetDracoDataJob() {
-                        dracoMesh = dracoMesh,
+                        result = dracoDecodeResult,
+                        dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
                         dstPtr = vDataPtr[map.stream] + map.offset
                     };
-                    jobHandles[jobIndex] = job.Schedule();
+                    jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
                 }
                 jobIndex++;
             }
-            return jobHandles;
+            var jobHandle = JobHandle.CombineDependencies(jobHandles);
+            jobHandles.Dispose();
+
+            var releaseDracoMeshJob = new ReleaseDracoMeshJob {
+                result = dracoDecodeResult,
+                dracoTempResources = dracoTempResources
+            };
+            return releaseDracoMeshJob.Schedule(jobHandle);
         }
 
         public void CreateMesh() {
             Profiler.BeginSample("CreateMesh");
+            
+            var dracoMesh = (DracoMesh*)dracoTempResources[meshPtrIndex];
+            allocator = dracoMesh->numVertices > persistentDataThreshold ? Allocator.Persistent : Allocator.TempJob;
+            
+            AllocateIndices(dracoMesh);
+            AllocateVertexBuffers(dracoMesh);
+            
+            Profiler.BeginSample("SetParameters");
             mesh = new Mesh();
             mesh.SetIndexBufferParams(indices.Length, IndexFormat.UInt32);
-            var vertexParams = new List<VertexAttributeDescriptor>(dracoMesh->numAttributes);
+            var vertexParams = new List<VertexAttributeDescriptor>(attributes.Count);
             foreach (var pair in attributes) {
                 var map = pair.Value;
                 vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents, map.stream));
             }
             mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
-            Profiler.EndSample(); // CreateUnityMesh.Mesh
+            Profiler.EndSample(); // SetParameters
+            Profiler.EndSample(); // CreateMesh
         }
 
+        public void DisposeDracoMesh() {
+            dracoDecodeResult.Dispose();
+            dracoTempResources.Dispose();
+        }
+        
         public Mesh PopulateMeshData() {
             
             Profiler.BeginSample("PopulateMeshData");
@@ -215,12 +261,6 @@ namespace Draco {
             mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length), flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
 
-            Profiler.BeginSample("ReleaseDracoMesh");
-            fixed (DracoMesh** dracoMeshPtr = &dracoMesh) {
-                ReleaseDracoMesh(dracoMeshPtr);
-            }
-            Profiler.EndSample();
-            
             Profiler.BeginSample("Dispose");
             indices.Dispose();
             foreach (var nativeArray in vData) {
@@ -358,6 +398,7 @@ namespace Draco {
             }
         }
 
+        [BurstCompile]
         struct DecodeJob : IJob {
             
             [ReadOnly]
@@ -367,59 +408,77 @@ namespace Draco {
             [ReadOnly]
             public int size;
 
-            public NativeArray<IntPtr> dracoMesh;
+            public NativeArray<int> result;
+            public NativeArray<IntPtr> dracoTempResources;
 
             public void Execute() {
                 DracoMesh* dracoMeshPtr;
                 DracoMesh** dracoMeshPtrPtr = &dracoMeshPtr;
                 void* decoder;
                 void* buffer;
-                Profiler.BeginSample("DecodeDracoMeshStep1");
                 var decodeResult = DecodeDracoMeshStep1(encodedData, size, dracoMeshPtrPtr, &decoder, &buffer);
-                Profiler.EndSample();
                 if (decodeResult < 0) {
-                    dracoMesh[0] = IntPtr.Zero;
+                    result[0] = -1;
                     return;
                 }
-                
-                // Debug.Log(dracoMeshPtr->numVertices);
-                Profiler.BeginSample("DecodeDracoMeshStep1");
-                decodeResult = DecodeDracoMeshStep2(dracoMeshPtrPtr, decoder, buffer);
-                Profiler.EndSample();
-                if (decodeResult <= 0) {
-                    dracoMesh[0] = IntPtr.Zero;
-                    return;
-                }
-                dracoMesh[0] = (IntPtr) dracoMeshPtr;
+                dracoTempResources[meshPtrIndex] = (IntPtr) dracoMeshPtr;
+                dracoTempResources[decoderPtrIndex] = (IntPtr) decoder;
+                dracoTempResources[bufferPtrIndex] = (IntPtr) buffer;
+                result[0] = 0;
             }
         }
         
+        [BurstCompile]
+        struct DecodeVerticesJob : IJob {
+            
+            public NativeArray<int> result;
+            public NativeArray<IntPtr> dracoTempResources;
+
+            public void Execute() {
+                if (result[0]<0) {
+                    return;
+                }
+                var dracoMeshPtr = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                var dracoMeshPtrPtr = &dracoMeshPtr;
+                var decoder = (void*) dracoTempResources[decoderPtrIndex];
+                var buffer = (void*) dracoTempResources[bufferPtrIndex];
+                var decodeResult = DecodeDracoMeshStep2(dracoMeshPtrPtr, decoder, buffer);
+                result[0] = decodeResult;
+            }
+        }
+        
+        [BurstCompile]
         struct GetDracoIndicesJob : IJob {
             
             [ReadOnly]
-            [NativeDisableUnsafePtrRestriction]
-            public DracoMesh* dracoMesh;
+            public NativeArray<int> result;
+            [ReadOnly]
+            public NativeArray<IntPtr> dracoTempResources;
         
             [WriteOnly]
             public NativeArray<uint> indices;
 
             public void Execute() {
-                Profiler.BeginSample("CreateUnityMesh.CopyIndices");
+                if (result[0]<0) {
+                    return;
+                }
+                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* dracoIndices;
                 GetMeshIndices(dracoMesh, &dracoIndices);
                 int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
                 int* indicesData = (int*)dracoIndices->data;
                 UnsafeUtility.MemCpy(indices.GetUnsafePtr(), indicesData, indices.Length * indexSize);
-                Profiler.EndSample(); // CreateUnityMesh.CopyIndices
-                Profiler.BeginSample("CreateUnityMesh.ReleaseIndices");
                 ReleaseDracoData(&dracoIndices);
             }
         }
 
+        [BurstCompile]
         struct GetDracoDataJob : IJob {
+            
             [ReadOnly]
-            [NativeDisableUnsafePtrRestriction]
-            public DracoMesh* dracoMesh;
+            public NativeArray<int> result;
+            [ReadOnly]
+            public NativeArray<IntPtr> dracoTempResources;
 
             [ReadOnly]
             [NativeDisableUnsafePtrRestriction]
@@ -430,23 +489,25 @@ namespace Draco {
             public byte* dstPtr;
         
             public void Execute() {
-                Profiler.BeginSample($"CreateUnityMesh.CopyVertexData{(AttributeType)attribute->attributeType}");
+                if (result[0]<0) {
+                    return;
+                }
+                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data);
                 var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
                 UnsafeUtility.MemCpy(dstPtr, (void*)data->data, elementSize*dracoMesh->numVertices);
-                Profiler.EndSample();
-                Profiler.BeginSample("CreateUnityMesh.ReleaseData");
                 ReleaseDracoData(&data);
-                Profiler.EndSample();
             }
         }
 
+        [BurstCompile]
         struct GetDracoDataInterleavedJob : IJob {
 
             [ReadOnly]
-            [NativeDisableUnsafePtrRestriction]
-            public DracoMesh* dracoMesh;
+            public NativeArray<int> result;
+            [ReadOnly]
+            public NativeArray<IntPtr> dracoTempResources;
 
             [ReadOnly]
             [NativeDisableUnsafePtrRestriction]
@@ -460,17 +521,32 @@ namespace Draco {
             public byte* dstPtr;
         
             public void Execute() {
-                Profiler.BeginSample($"CreateUnityMesh.CopyVertexData{(AttributeType)attribute->attributeType}");
+                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data);
                 var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
                 for (var v = 0; v < dracoMesh->numVertices; v++) {
                     UnsafeUtility.MemCpy(dstPtr+(stride*v), ((byte*)data->data)+(elementSize*v), elementSize);
                 }
-                Profiler.EndSample();
-                Profiler.BeginSample("CreateUnityMesh.ReleaseData");
                 ReleaseDracoData(&data);
-                Profiler.EndSample();
+            }
+        }
+      
+        [BurstCompile]
+        struct ReleaseDracoMeshJob : IJob {
+
+            [ReadOnly]
+            public NativeArray<int> result;
+            public NativeArray<IntPtr> dracoTempResources;
+
+            public void Execute() {
+                if (dracoTempResources[meshPtrIndex] != IntPtr.Zero) {
+                    var dracoMeshPtr = (DracoMesh**) dracoTempResources.GetUnsafePtr();
+                    ReleaseDracoMesh(dracoMeshPtr);
+                }
+                dracoTempResources[meshPtrIndex]=IntPtr.Zero;
+                dracoTempResources[decoderPtrIndex]=IntPtr.Zero;
+                dracoTempResources[bufferPtrIndex]=IntPtr.Zero;
             }
         }
       
