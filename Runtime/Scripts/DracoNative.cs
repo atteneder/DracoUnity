@@ -131,11 +131,11 @@ namespace Draco {
                 calculateNormals = true;
                 attributes[VertexAttribute.Normal] = new CalculatedAttributeMap(VertexAttributeFormat.Float32, 3, 4 );
             }
-            CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
-            var hasTexCoords = CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
             if (requireTangents) {
                 attributes[VertexAttribute.Tangent] = new CalculatedAttributeMap(VertexAttributeFormat.Float32, 4, 4 );
             }
+            CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
+            var hasTexCoords = CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
 
             // TODO: If known, query generic attributes by ID
             // CreateAttributeMaps(AttributeType.GENERIC,2);
