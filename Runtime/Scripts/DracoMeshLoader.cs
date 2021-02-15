@@ -23,8 +23,21 @@ using UnityEngine.Rendering;
 
 namespace Draco {
 
-    public class DracoMeshLoader
-    {
+    public class DracoMeshLoader {
+        
+        /// <summary>
+        /// If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).
+        /// </summary>
+        bool convertSpace;
+
+        /// <summary>
+        /// Create a DracoMeshLoader instance which let's you decode Draco data.
+        /// </summary>
+        /// <param name="convertSpace">If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).</param>
+        public DracoMeshLoader(bool convertSpace = true) {
+            this.convertSpace = convertSpace;
+        }
+
         public struct DecodeResult {
             /// <summary>
             /// True if the decoding was successful
@@ -126,10 +139,10 @@ namespace Draco {
 #endif
         {
 #if UNITY_2020_2_OR_NEWER
-            var dracoNative = new DracoNative(mesh);
+            var dracoNative = new DracoNative(mesh,convertSpace);
             var result = new DecodeResult();
 #else
-            var dracoNative = new DracoNative();
+            var dracoNative = new DracoNative(convertSpace);
 #endif
             await WaitForJobHandle(dracoNative.Init(encodedData, size));
             if (dracoNative.ErrorOccured()) {

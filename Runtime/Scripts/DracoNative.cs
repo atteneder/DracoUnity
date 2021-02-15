@@ -39,7 +39,12 @@ namespace Draco {
         const int meshPtrIndex = 0;
         const int decoderPtrIndex = 1;
         const int bufferPtrIndex = 2;
-        
+
+        /// <summary>
+        /// If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).
+        /// </summary>
+        bool convertSpace;
+
         Dictionary<VertexAttribute, AttributeMapBase> attributes;
         int streamCount;
         int[] streamStrides;
@@ -59,11 +64,18 @@ namespace Draco {
 #endif
 
 
-#if UNITY_2020_2_OR_NEWER        
-        public DracoNative(Mesh.MeshData mesh) {
-            this.mesh = mesh;
-        }
+        public DracoNative(
+#if UNITY_2020_2_OR_NEWER
+            Mesh.MeshData mesh,
 #endif
+            bool convertSpace = true
+            )
+        {
+            this.convertSpace = convertSpace;
+#if UNITY_2020_2_OR_NEWER
+            this.mesh = mesh;
+#endif
+        }
 
         public JobHandle Init(IntPtr encodedData, int size) {
             dracoDecodeResult = new NativeArray<int>(1, Allocator.Persistent);
@@ -188,6 +200,7 @@ namespace Draco {
             var indicesJob = new GetDracoIndicesJob() {
                 result = dracoDecodeResult,
                 dracoTempResources = dracoTempResources,
+                flip = convertSpace,
 #if UNITY_2020_2_OR_NEWER
                 mesh = mesh
 #else
@@ -209,6 +222,7 @@ namespace Draco {
                         dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
                         stride = streamStrides[map.stream],
+                        flip = convertSpace,
 #if UNITY_2020_2_OR_NEWER                        
                         mesh = mesh, 
                         streamIndex = map.stream, 
@@ -224,6 +238,7 @@ namespace Draco {
                         result = dracoDecodeResult,
                         dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
+                        flip = convertSpace,
 #if UNITY_2020_2_OR_NEWER                        
                         mesh = mesh, 
                         streamIndex = map.stream
@@ -431,12 +446,12 @@ namespace Draco {
         // input, indices must be null. The returned indices must be released with
         // ReleaseDracoData.
         [DllImport ("dracodec_unity")] unsafe static extern bool GetMeshIndices(
-            DracoMesh* mesh, DracoData**indices);
+            DracoMesh* mesh, DracoData**indices, bool flip);
         // Returns an array of attribute data as well as the type of data in
         // data_type. On input, data must be null. The returned data must be
         // released with ReleaseDracoData.
         [DllImport ("dracodec_unity")] unsafe static extern bool GetAttributeData(
-            DracoMesh* mesh, DracoAttribute* attr, DracoData**data);
+            DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip);
 
         abstract class AttributeMapBase {
             public VertexAttributeFormat format;
@@ -542,6 +557,8 @@ namespace Draco {
             public NativeArray<int> result;
             [ReadOnly]
             public NativeArray<IntPtr> dracoTempResources;
+            [ReadOnly]
+            public bool flip;
         
 #if UNITY_2020_2_OR_NEWER
             public Mesh.MeshData mesh;
@@ -556,7 +573,7 @@ namespace Draco {
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* dracoIndices;
-                GetMeshIndices(dracoMesh, &dracoIndices);
+                GetMeshIndices(dracoMesh, &dracoIndices, flip);
                 int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
                 int* indicesData = (int*)dracoIndices->data;
 #if UNITY_2020_2_OR_NEWER
@@ -578,7 +595,10 @@ namespace Draco {
             [ReadOnly]
             [NativeDisableUnsafePtrRestriction]
             public DracoAttribute* attribute;
-        
+
+            [ReadOnly]
+            public bool flip;
+
 #if UNITY_2020_2_OR_NEWER
             public Mesh.MeshData mesh;
             [ReadOnly]
@@ -595,7 +615,7 @@ namespace Draco {
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
-                GetAttributeData(dracoMesh, attribute, &data);
+                GetAttributeData(dracoMesh, attribute, &data, flip);
                 var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
 #if UNITY_2020_2_OR_NEWER
                 var dst = mesh.GetVertexData<byte>(streamIndex);
@@ -620,7 +640,10 @@ namespace Draco {
         
             [ReadOnly]
             public int stride;
-        
+            
+            [ReadOnly]
+            public bool flip;
+
 #if UNITY_2020_2_OR_NEWER
             public Mesh.MeshData mesh;
             [ReadOnly]
@@ -635,7 +658,7 @@ namespace Draco {
             public void Execute() {
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
-                GetAttributeData(dracoMesh, attribute, &data);
+                GetAttributeData(dracoMesh, attribute, &data, flip);
                 var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
 #if UNITY_2020_2_OR_NEWER
                 var dst = mesh.GetVertexData<byte>(streamIndex);

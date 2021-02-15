@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Burst
 - Unit tests
 - Require Normals/Tangents parameter (necessity when using Advanced Mesh API). If true, even if the draco mesh does not have the required vertex attributes, buffers for them will get allocated and the values are calculated.
+- Parameter for coordinate space conversion (was on by default before)
 ### Changes
 - API is now async/await based
 
