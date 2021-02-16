@@ -58,7 +58,14 @@ namespace Draco {
         /// </summary>
         /// <param name="encodedData">Compressed Draco data</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
-        public async Task<Mesh> ConvertDracoMeshToUnity(NativeArray<byte> encodedData, bool requireNormals = false, bool requireTangents = false) {
+        public async Task<Mesh> ConvertDracoMeshToUnity(
+            NativeSlice<byte> encodedData,
+            bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
+            )
+        {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
 #if UNITY_2020_2_OR_NEWER
             var meshDataArray = Mesh.AllocateWritableMeshData(1); 
@@ -78,7 +85,7 @@ namespace Draco {
             }
             return unityMesh;
 #else
-            return await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents);
+            return await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
 #endif
         }
 
@@ -113,16 +120,29 @@ namespace Draco {
         }
 
 #if UNITY_2020_2_OR_NEWER
-        public async Task<DecodeResult> ConvertDracoMeshToUnity(Mesh.MeshData mesh, byte[] encodedData, bool requireNormals = false, bool requireTangents = false) {
+        public async Task<DecodeResult> ConvertDracoMeshToUnity(
+            Mesh.MeshData mesh,
+            byte[] encodedData,
+            bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
+            )
+        {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
-            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents);
+            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
             UnsafeUtility.ReleaseGCObject(gcHandle);
             return result;
         }
         
-        public async Task<DecodeResult> ConvertDracoMeshToUnity(Mesh.MeshData mesh, NativeArray<byte> encodedData, bool requireNormals = false, bool requireTangents = false) {
+        public async Task<DecodeResult> ConvertDracoMeshToUnity(Mesh.MeshData mesh, NativeArray<byte> encodedData, bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
+            )
+        {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
-            return await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents);
+            return await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
         }
 #endif
         
@@ -132,10 +152,19 @@ namespace Draco {
             IntPtr encodedData,
             int size,
             bool requireNormals,
-            bool requireTangents
+            bool requireTangents,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
         )
 #else
-        async Task<Mesh> ConvertDracoMeshToUnity(IntPtr encodedData, int size, bool requireNormals, bool requireTangents)
+        async Task<Mesh> ConvertDracoMeshToUnity(
+            IntPtr encodedData,
+            int size,
+            bool requireNormals,
+            bool requireTangents,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
+            )
 #endif
         {
 #if UNITY_2020_2_OR_NEWER
@@ -157,9 +186,9 @@ namespace Draco {
                 requireNormals = true;
             }
 #if UNITY_2020_2_OR_NEWER
-            dracoNative.CreateMesh(out result.calculateNormals, requireNormals,requireTangents);
+            dracoNative.CreateMesh(out result.calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
 #else
-            dracoNative.CreateMesh(out var calculateNormals, requireNormals,requireTangents);
+            dracoNative.CreateMesh(out var calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
 #endif      
             await WaitForJobHandle(dracoNative.DecodeVertexData());
             var error = dracoNative.ErrorOccured();
@@ -199,7 +228,7 @@ namespace Draco {
             jobHandle.Complete();
         }
         
-        static unsafe IntPtr GetUnsafeReadOnlyIntPtr(NativeArray<byte> encodedData) {
+        static unsafe IntPtr GetUnsafeReadOnlyIntPtr(NativeSlice<byte> encodedData) {
             return (IntPtr) encodedData.GetUnsafeReadOnlyPtr();
         }
         

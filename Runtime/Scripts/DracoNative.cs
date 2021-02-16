@@ -93,7 +93,14 @@ namespace Draco {
             return dracoDecodeResult[0] < 0;
         }
         
-        void CalculateVertexParams(DracoMesh* dracoMesh, bool requireNormals, bool requireTangents, out bool calculateNormals)
+        void CalculateVertexParams(
+            DracoMesh* dracoMesh,
+            bool requireNormals,
+            bool requireTangents,
+            int weightsAttributeId,
+            int jointsAttributeId,
+            out bool calculateNormals
+            )
         {
             Profiler.BeginSample("CalculateVertexParams");
             attributes = new Dictionary<VertexAttribute, AttributeMapBase>();
@@ -124,7 +131,7 @@ namespace Draco {
                         var format = GetVertexAttributeFormat((DataType)attribute->dataType);
                         if (!format.HasValue) { continue; }
 
-                        var map = new AttributeMap(attribute, format.Value);
+                        var map = new AttributeMap(attribute, format.Value, convertSpace && ConvertSpace(type.Value));
                         attributes[type.Value] = map;
                         foundAttribute = true;
                     }
@@ -134,6 +141,27 @@ namespace Draco {
                     }
                 }
                 return foundAttribute;
+            }
+            
+            bool CreateAttributeMapById(VertexAttribute type, int id, DracoMesh* draco) {
+                if (attributes.ContainsKey(type)) {
+#if UNITY_EDITOR
+                    // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
+                    Debug.LogWarning($"Multiple {type} attributes!");
+#endif
+                    return false;
+                }
+
+                DracoAttribute* attribute;
+                if (GetAttributeByUniqueId(draco, id, &attribute)) {
+                    var format = GetVertexAttributeFormat((DataType)attribute->dataType);
+                    if (!format.HasValue) { return false; }
+
+                    var map = new AttributeMap(attribute, format.Value, convertSpace && ConvertSpace(type));
+                    attributes[type] = map;
+                    return true;
+                }
+                return false;
             }
 
             CreateAttributeMaps(AttributeType.POSITION, 1, dracoMesh);
@@ -149,9 +177,13 @@ namespace Draco {
             CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
             var hasTexCoords = CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
 
-            // TODO: If known, query generic attributes by ID
-            // CreateAttributeMaps(AttributeType.GENERIC,2);
-        
+            if (weightsAttributeId >= 0) {
+                CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh);
+            }
+            if (jointsAttributeId >= 0) {
+                CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh);
+            }
+            
             streamStrides = new int[maxStreamCount];
             streamMemberCount = new int[maxStreamCount];
             int streamIndex = 0;
@@ -222,7 +254,7 @@ namespace Draco {
                         dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
                         stride = streamStrides[map.stream],
-                        flip = convertSpace,
+                        flip = map.convertSpace,
 #if UNITY_2020_2_OR_NEWER                        
                         mesh = mesh, 
                         streamIndex = map.stream, 
@@ -238,7 +270,7 @@ namespace Draco {
                         result = dracoDecodeResult,
                         dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
-                        flip = convertSpace,
+                        flip = map.convertSpace,
 #if UNITY_2020_2_OR_NEWER                        
                         mesh = mesh, 
                         streamIndex = map.stream
@@ -262,15 +294,17 @@ namespace Draco {
         public void CreateMesh(
             out bool calculateNormals,
             bool requireNormals = false,
-            bool requireTangents = false
-            )
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
+        )
         {
             Profiler.BeginSample("CreateMesh");
             
             var dracoMesh = (DracoMesh*)dracoTempResources[meshPtrIndex];
             allocator = dracoMesh->numVertices > persistentDataThreshold ? Allocator.Persistent : Allocator.TempJob;
             
-            CalculateVertexParams(dracoMesh, requireNormals, requireTangents,out calculateNormals);
+            CalculateVertexParams(dracoMesh, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId, out calculateNormals);
             
             Profiler.BeginSample("SetParameters");
 #if !UNITY_2020_2_OR_NEWER
@@ -457,6 +491,7 @@ namespace Draco {
             public VertexAttributeFormat format;
             public int offset;
             public int stream;
+            public bool flip;
         
             public AttributeMapBase (VertexAttributeFormat format) {
                 this.format = format;
@@ -472,9 +507,11 @@ namespace Draco {
         
         class AttributeMap : AttributeMapBase {
             public DracoAttribute* dracoAttribute;
+            public bool convertSpace = false;
 
-            public AttributeMap (DracoAttribute* dracoAttribute, VertexAttributeFormat format) : base(format) {
+            public AttributeMap (DracoAttribute* dracoAttribute, VertexAttributeFormat format, bool convertSpace) : base(format) {
                 this.dracoAttribute = dracoAttribute;
+                this.convertSpace = convertSpace;
             }
 
             public override int numComponents => dracoAttribute->numComponents;
@@ -754,6 +791,25 @@ namespace Draco {
                 //   break;
                 default:
                     return null;
+            }
+        }
+
+        bool ConvertSpace(VertexAttribute attr) {
+            switch (attr) {
+                case VertexAttribute.Position:
+                case VertexAttribute.Normal:
+                case VertexAttribute.Tangent:
+                case VertexAttribute.TexCoord0:
+                case VertexAttribute.TexCoord1:
+                case VertexAttribute.TexCoord2:
+                case VertexAttribute.TexCoord3:
+                case VertexAttribute.TexCoord4:
+                case VertexAttribute.TexCoord5:
+                case VertexAttribute.TexCoord6:
+                case VertexAttribute.TexCoord7:
+                    return true;
+                default:
+                    return false;
             }
         }
     }
