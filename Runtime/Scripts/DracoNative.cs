@@ -198,7 +198,7 @@ namespace Draco {
                 attributeMap.stream = streamIndex;
                 streamStrides[streamIndex] += elementSize;
                 streamMemberCount[streamIndex]++;
-                if (streamIndex < maxStreamCount) { streamIndex++; }
+                if (streamIndex < maxStreamCount-1) { streamIndex++; }
             }
             streamCount = streamIndex;
             Profiler.EndSample(); // CalculateVertexParams
