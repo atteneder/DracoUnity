@@ -70,7 +70,7 @@ namespace Draco {
 #if UNITY_2020_2_OR_NEWER
             var meshDataArray = Mesh.AllocateWritableMeshData(1); 
             var mesh = meshDataArray[0];
-            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents);
+            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
             if (!result.success) {
                 meshDataArray.Dispose();
                 return null;
@@ -94,12 +94,19 @@ namespace Draco {
         /// </summary>
         /// <param name="encodedData">Compressed Draco data</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
-        public async Task<Mesh> ConvertDracoMeshToUnity(byte[] encodedData, bool requireNormals = false, bool requireTangents = false) {
+        public async Task<Mesh> ConvertDracoMeshToUnity(
+            byte[] encodedData,
+            bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1
+            )
+        {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
 #if UNITY_2020_2_OR_NEWER
             using (var meshDataArray = Mesh.AllocateWritableMeshData(1)) {
                 var mesh = meshDataArray[0];
-                var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents);
+                var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
                 UnsafeUtility.ReleaseGCObject(gcHandle);
                 if (!result.success) return null;
                 var unityMesh = new Mesh();
@@ -113,7 +120,7 @@ namespace Draco {
                 return unityMesh;
             }
 #else
-            var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents);
+            var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
             UnsafeUtility.ReleaseGCObject(gcHandle);
             return result;
 #endif
