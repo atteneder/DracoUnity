@@ -25,10 +25,42 @@ using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 namespace Draco {
+    
+    // These values must be exactly the same as the values in draco_types.h.
+    // Attribute data type.
+    enum DataType {
+        DT_INVALID = 0,
+        DT_INT8,
+        DT_UINT8,
+        DT_INT16,
+        DT_UINT16,
+        DT_INT32,
+        DT_UINT32,
+        DT_INT64,
+        DT_UINT64,
+        DT_FLOAT32,
+        DT_FLOAT64,
+        DT_BOOL
+    }
 
-    unsafe class DracoNative {
+    // These values must be exactly the same as the values in
+    // geometry_attribute.h.
+    // Attribute type.
+    enum AttributeType {
+        INVALID = -1,
+        POSITION = 0,
+        NORMAL,
+        COLOR,
+        TEX_COORD,
+        // A special id used to mark attributes that are not assigned to any known
+        // predefined use case. Such attributes are often used for a shader specific
+        // data.
+        GENERIC
+    }
+    
+    unsafe internal class DracoNative {
         
-        const int maxStreamCount = 4;
+        public const int maxStreamCount = 4;
         
         /// <summary>
         /// If Draco mesh has more vertices than this value, memory is allocated persistent,
@@ -383,38 +415,6 @@ namespace Draco {
             return mesh;
 #endif
         }
-      
-        // These values must be exactly the same as the values in draco_types.h.
-        // Attribute data type.
-        enum DataType {
-            DT_INVALID = 0,
-            DT_INT8,
-            DT_UINT8,
-            DT_INT16,
-            DT_UINT16,
-            DT_INT32,
-            DT_UINT32,
-            DT_INT64,
-            DT_UINT64,
-            DT_FLOAT32,
-            DT_FLOAT64,
-            DT_BOOL
-        };
-
-        // These values must be exactly the same as the values in
-        // geometry_attribute.h.
-        // Attribute type.
-        enum AttributeType {
-            INVALID = -1,
-            POSITION = 0,
-            NORMAL,
-            COLOR,
-            TEX_COORD,
-            // A special id used to mark attributes that are not assigned to any known
-            // predefined use case. Such attributes are often used for a shader specific
-            // data.
-            GENERIC
-        };
 
         // The order must be consistent with C++ interface.
         [StructLayout (LayoutKind.Sequential)] public struct DracoData
@@ -786,9 +786,6 @@ namespace Draco {
                     return VertexAttribute.Color;
                 case AttributeType.TEX_COORD:
                     return (VertexAttribute) ((int)VertexAttribute.TexCoord0+index);
-                // case AttributeType.GENERIC:
-                //   // TODO: map generic to possible candidates (BlendWeights, BlendIndices)
-                //   break;
                 default:
                     return null;
             }
