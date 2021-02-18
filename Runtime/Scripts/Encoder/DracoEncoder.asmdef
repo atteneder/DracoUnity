@@ -1,18 +1,15 @@
 {
-    "name": "DracoEditor",
-    "rootNamespace": "",
+    "name": "DracoEncoder",
     "references": [
-        "Draco",
-        "DracoEncoder"
+        "GUID:1f1db07d22489445ab0fc8ed6ef2ed4f",
+        "GUID:d8b63aba1907145bea998dd612889d6b"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": true,
+    "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
