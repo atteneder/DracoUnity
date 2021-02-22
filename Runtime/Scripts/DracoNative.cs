@@ -381,12 +381,8 @@ namespace Draco {
             attributes = null;
 
             Profiler.BeginSample("MeshAssign");
-            
-            const MeshUpdateFlags flags =
-                MeshUpdateFlags.DontNotifyMeshUsers |
-                MeshUpdateFlags.DontRecalculateBounds |
-                MeshUpdateFlags.DontResetBoneBounds |
-                MeshUpdateFlags.DontValidateIndices;
+
+            const MeshUpdateFlags flags = DracoMeshLoader.defaultMeshUpdateFlags;
 
 #if DRACO_MESH_DATA
             var indices = mesh.GetIndexData<uint>();
