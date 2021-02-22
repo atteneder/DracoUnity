@@ -105,13 +105,20 @@ namespace Draco {
             bool requireTangents = false,
             int weightsAttributeId = -1,
             int jointsAttributeId = -1
-            )
+#if UNITY_EDITOR
+            ,bool sync = false
+#endif
+        )
         {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
 #if DRACO_MESH_DATA
             var meshDataArray = Mesh.AllocateWritableMeshData(1);
             var mesh = meshDataArray[0];
-            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId
+#if UNITY_EDITOR
+                ,sync
+#endif
+            );
             UnsafeUtility.ReleaseGCObject(gcHandle);
             if (!result.success) {
                 meshDataArray.Dispose();
@@ -127,7 +134,11 @@ namespace Draco {
             }
             return unityMesh;
 #else
-            var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId
+#if UNITY_EDITOR
+                ,sync
+#endif
+            );
             UnsafeUtility.ReleaseGCObject(gcHandle);
             return result;
 #endif
@@ -153,10 +164,17 @@ namespace Draco {
             bool requireTangents = false,
             int weightsAttributeId = -1,
             int jointsAttributeId = -1
+#if UNITY_EDITOR
+            ,bool sync = false
+#endif
             )
         {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
-            return await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            return await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId
+#if UNITY_EDITOR
+            ,sync
+#endif
+            );
         }
 #endif
         
@@ -169,6 +187,9 @@ namespace Draco {
             bool requireTangents,
             int weightsAttributeId = -1,
             int jointsAttributeId = -1
+#if UNITY_EDITOR
+            ,bool sync = false
+#endif
         )
 #else
         async Task<Mesh> ConvertDracoMeshToUnity(
@@ -178,6 +199,9 @@ namespace Draco {
             bool requireTangents,
             int weightsAttributeId = -1,
             int jointsAttributeId = -1
+#if UNITY_EDITOR
+            ,bool sync = false
+#endif
             )
 #endif
         {
@@ -187,7 +211,16 @@ namespace Draco {
 #else
             var dracoNative = new DracoNative(convertSpace);
 #endif
-            await WaitForJobHandle(dracoNative.Init(encodedData, size));
+
+#if UNITY_EDITOR
+            if (sync) {
+                dracoNative.InitSync(encodedData, size);
+            }
+            else
+#endif
+            {
+                await WaitForJobHandle(dracoNative.Init(encodedData, size));
+            }
             if (dracoNative.ErrorOccured()) {
 #if DRACO_MESH_DATA
                 return result;
@@ -203,8 +236,17 @@ namespace Draco {
             dracoNative.CreateMesh(out result.calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
 #else
             dracoNative.CreateMesh(out var calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
-#endif      
-            await WaitForJobHandle(dracoNative.DecodeVertexData());
+#endif
+            
+#if UNITY_EDITOR
+            if (sync) {
+                dracoNative.DecodeVertexDataSync();
+            }
+            else
+#endif
+            {
+                await WaitForJobHandle(dracoNative.DecodeVertexData());
+            }
             var error = dracoNative.ErrorOccured();
             dracoNative.DisposeDracoMesh();
             if (error) {

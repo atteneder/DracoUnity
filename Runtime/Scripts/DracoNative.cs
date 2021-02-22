@@ -125,6 +125,18 @@ namespace Draco {
         }
 
         public JobHandle Init(IntPtr encodedData, int size) {
+            var decodeJob = CreateDecodeJob(encodedData, size);
+            return decodeJob.Schedule();
+        }
+
+#if UNITY_EDITOR
+        public void InitSync(IntPtr encodedData, int size) {
+            var decodeJob = CreateDecodeJob(encodedData, size);
+            decodeJob.Run();
+        }
+#endif
+
+        DecodeJob CreateDecodeJob(IntPtr encodedData, int size) {
             dracoDecodeResult = new NativeArray<int>(1, Allocator.Persistent);
             dracoTempResources = new NativeArray<IntPtr>(3, Allocator.Persistent);
             var decodeJob = new DecodeJob() {
@@ -133,7 +145,7 @@ namespace Draco {
                 result = dracoDecodeResult,
                 dracoTempResources = dracoTempResources
             };
-            return decodeJob.Schedule();
+            return decodeJob;
         }
 
         public bool ErrorOccured() {
@@ -294,12 +306,28 @@ namespace Draco {
         }
 #endif
 
-        public JobHandle DecodeVertexData() {
+#if UNITY_EDITOR
+        public void DecodeVertexDataSync() {
+            DecodeVertexData(true);
+        }
+#endif
+
+        public JobHandle DecodeVertexData(
+#if UNITY_EDITOR
+            bool sync = false
+#endif
+            )
+        {
             var decodeVerticesJob = new DecodeVerticesJob() {
                 result = dracoDecodeResult,
                 dracoTempResources = dracoTempResources
             };
             var decodeVerticesJobHandle = decodeVerticesJob.Schedule();
+#if UNITY_EDITOR
+            if (sync) {
+                decodeVerticesJobHandle.Complete();
+            }
+#endif
             
             var indicesJob = new GetDracoIndicesJob() {
                 result = dracoDecodeResult,
@@ -315,6 +343,11 @@ namespace Draco {
             NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(attributes.Count+1, allocator);
             
             jobHandles[0] = indicesJob.Schedule(decodeVerticesJobHandle);
+#if UNITY_EDITOR
+            if (sync) {
+                jobHandles[0].Complete();
+            }
+#endif
             
             int jobIndex = 1;
             foreach (var mapBase in attributes) {
@@ -352,6 +385,11 @@ namespace Draco {
                     };
                     jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
                 }
+#if UNITY_EDITOR
+                if (sync) {
+                    jobHandles[jobIndex].Complete();
+                }
+#endif
                 jobIndex++;
             }
             var jobHandle = JobHandle.CombineDependencies(jobHandles);
@@ -360,7 +398,14 @@ namespace Draco {
             var releaseDracoMeshJob = new ReleaseDracoMeshJob {
                 dracoTempResources = dracoTempResources
             };
-            return releaseDracoMeshJob.Schedule(jobHandle);
+            var releaseDreacoMeshJobHandle = releaseDracoMeshJob.Schedule(jobHandle);
+
+#if UNITY_EDITOR
+            if (sync) {
+                releaseDreacoMeshJobHandle.Complete();
+            }
+#endif
+            return releaseDreacoMeshJobHandle;
         }
 
         public void CreateMesh(
