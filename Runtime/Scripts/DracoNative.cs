@@ -13,6 +13,10 @@
 // limitations under the License.
 //
 
+#if UNITY_2020_2_OR_NEWER
+#define DRACO_MESH_DATA
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -86,7 +90,7 @@ namespace Draco {
         NativeArray<int> dracoDecodeResult;
         NativeArray<IntPtr> dracoTempResources;
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
         Mesh.MeshData mesh;
 #else
         Mesh mesh;
@@ -97,14 +101,14 @@ namespace Draco {
 
 
         public DracoNative(
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             Mesh.MeshData mesh,
 #endif
             bool convertSpace = true
             )
         {
             this.convertSpace = convertSpace;
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             this.mesh = mesh;
 #endif
         }
@@ -236,7 +240,7 @@ namespace Draco {
             Profiler.EndSample(); // CalculateVertexParams
         }
 
-#if !UNITY_2020_2_OR_NEWER
+#if !DRACO_MESH_DATA
         void AllocateIndices(DracoMesh* dracoMesh) {
             Profiler.BeginSample("AllocateIndices");
             indices = new NativeArray<uint>(dracoMesh->numFaces * 3, allocator, NativeArrayOptions.UninitializedMemory);
@@ -265,7 +269,7 @@ namespace Draco {
                 result = dracoDecodeResult,
                 dracoTempResources = dracoTempResources,
                 flip = convertSpace,
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
                 mesh = mesh
 #else
                 indices = indices
@@ -287,7 +291,7 @@ namespace Draco {
                         attribute = map.dracoAttribute,
                         stride = streamStrides[map.stream],
                         flip = map.convertSpace,
-#if UNITY_2020_2_OR_NEWER                        
+#if DRACO_MESH_DATA                        
                         mesh = mesh, 
                         streamIndex = map.stream, 
                         offset = map.offset
@@ -303,7 +307,7 @@ namespace Draco {
                         dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
                         flip = map.convertSpace,
-#if UNITY_2020_2_OR_NEWER                        
+#if DRACO_MESH_DATA                        
                         mesh = mesh, 
                         streamIndex = map.stream
 #else
@@ -339,7 +343,7 @@ namespace Draco {
             CalculateVertexParams(dracoMesh, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId, out calculateNormals);
             
             Profiler.BeginSample("SetParameters");
-#if !UNITY_2020_2_OR_NEWER
+#if !DRACO_MESH_DATA
             mesh = new Mesh();
 #endif
             mesh.SetIndexBufferParams(dracoMesh->numFaces*3, IndexFormat.UInt32);
@@ -349,7 +353,7 @@ namespace Draco {
                 vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents, map.stream));
             }
             mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
-#if !UNITY_2020_2_OR_NEWER
+#if !DRACO_MESH_DATA
             AllocateIndices(dracoMesh);
             AllocateVertexBuffers(dracoMesh);
 #endif
@@ -362,7 +366,7 @@ namespace Draco {
             dracoTempResources.Dispose();
         }
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
         public bool 
 #else
         public Mesh
@@ -384,7 +388,7 @@ namespace Draco {
                 MeshUpdateFlags.DontResetBoneBounds |
                 MeshUpdateFlags.DontValidateIndices;
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             var indices = mesh.GetIndexData<uint>();
 #else
             for (var streamIndex = 0; streamIndex < streamCount; streamIndex++) {
@@ -398,7 +402,7 @@ namespace Draco {
             mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length), flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
 #else
             Profiler.BeginSample("Dispose");
             indices.Dispose();
@@ -409,7 +413,7 @@ namespace Draco {
 #endif
             Profiler.EndSample();
             
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             return true;
 #else
             return mesh;
@@ -597,7 +601,7 @@ namespace Draco {
             [ReadOnly]
             public bool flip;
         
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             public Mesh.MeshData mesh;
 #else
             [WriteOnly]
@@ -613,7 +617,7 @@ namespace Draco {
                 GetMeshIndices(dracoMesh, &dracoIndices, flip);
                 int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
                 int* indicesData = (int*)dracoIndices->data;
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
                 var indices = mesh.GetIndexData<uint>();
 #endif
                 UnsafeUtility.MemCpy(indices.GetUnsafePtr(), indicesData, indices.Length * indexSize);
@@ -636,7 +640,7 @@ namespace Draco {
             [ReadOnly]
             public bool flip;
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             public Mesh.MeshData mesh;
             [ReadOnly]
             public int streamIndex;
@@ -654,7 +658,7 @@ namespace Draco {
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data, flip);
                 var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
                 var dst = mesh.GetVertexData<byte>(streamIndex);
                 var dstPtr = dst.GetUnsafePtr();
 #endif
@@ -681,7 +685,7 @@ namespace Draco {
             [ReadOnly]
             public bool flip;
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             public Mesh.MeshData mesh;
             [ReadOnly]
             public int streamIndex;
@@ -697,7 +701,7 @@ namespace Draco {
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data, flip);
                 var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
                 var dst = mesh.GetVertexData<byte>(streamIndex);
                 var dstPtr =  ((byte*)dst.GetUnsafePtr()) + offset;
 #endif

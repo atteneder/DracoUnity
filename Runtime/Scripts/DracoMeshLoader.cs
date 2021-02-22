@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
+#if UNITY_2020_2_OR_NEWER
+#define DRACO_MESH_DATA
+#endif
+
 using System;
 using System.Threading.Tasks;
 using Unity.Collections;
@@ -67,7 +72,7 @@ namespace Draco {
             )
         {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             var meshDataArray = Mesh.AllocateWritableMeshData(1); 
             var mesh = meshDataArray[0];
             var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
@@ -103,7 +108,7 @@ namespace Draco {
             )
         {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             using (var meshDataArray = Mesh.AllocateWritableMeshData(1)) {
                 var mesh = meshDataArray[0];
                 var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
@@ -126,7 +131,7 @@ namespace Draco {
 #endif
         }
 
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
         public async Task<DecodeResult> ConvertDracoMeshToUnity(
             Mesh.MeshData mesh,
             byte[] encodedData,
@@ -153,7 +158,7 @@ namespace Draco {
         }
 #endif
         
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
         async Task<DecodeResult> ConvertDracoMeshToUnity(
             Mesh.MeshData mesh,
             IntPtr encodedData,
@@ -174,7 +179,7 @@ namespace Draco {
             )
 #endif
         {
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             var dracoNative = new DracoNative(mesh,convertSpace);
             var result = new DecodeResult();
 #else
@@ -182,7 +187,7 @@ namespace Draco {
 #endif
             await WaitForJobHandle(dracoNative.Init(encodedData, size));
             if (dracoNative.ErrorOccured()) {
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
                 return result;
 #else
                 return null;
@@ -192,7 +197,7 @@ namespace Draco {
                 // Sanity check: We need normals to calculate tangents
                 requireNormals = true;
             }
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
             dracoNative.CreateMesh(out result.calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
 #else
             dracoNative.CreateMesh(out var calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
@@ -201,14 +206,14 @@ namespace Draco {
             var error = dracoNative.ErrorOccured();
             dracoNative.DisposeDracoMesh();
             if (error) {
-#if UNITY_2020_2_OR_NEWER
+#if DRACO_MESH_DATA
                 return result;
 #else
                 return null;
 #endif
             }
 
-#if !UNITY_2020_2_OR_NEWER
+#if !DRACO_MESH_DATA
             var result = dracoNative.PopulateMeshData();
             if (calculateNormals) {
                 // TODO: Consider doing this in a threaded Job
