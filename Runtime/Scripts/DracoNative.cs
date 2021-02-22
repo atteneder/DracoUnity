@@ -222,21 +222,21 @@ namespace Draco {
             
             streamStrides = new int[maxStreamCount];
             streamMemberCount = new int[maxStreamCount];
-            int streamIndex = 0;
+            int streamIndex = -1;
             foreach (var pair in attributes) {
                 // Naive stream assignment:
                 // First 3 attributes get a dedicated stream (#1,#2 and #3 respectivly)
                 // 4th and following get assigned to stream #4
                 // TODO: Make smarter stream assignment decision
+                if (streamIndex < maxStreamCount-1) { streamIndex++; }
                 var attributeMap = pair.Value;
                 var elementSize = attributeMap.elementSize;
                 attributeMap.offset = streamStrides[streamIndex];
                 attributeMap.stream = streamIndex;
                 streamStrides[streamIndex] += elementSize;
                 streamMemberCount[streamIndex]++;
-                if (streamIndex < maxStreamCount-1) { streamIndex++; }
             }
-            streamCount = streamIndex;
+            streamCount = streamIndex+1;
             Profiler.EndSample(); // CalculateVertexParams
         }
 
