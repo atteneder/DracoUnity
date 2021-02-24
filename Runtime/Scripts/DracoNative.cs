@@ -302,11 +302,31 @@ namespace Draco {
                 indices = indices
 #endif
             };
+
+            // TODO: expose as parameter
+            var sortBlendWeights = true; 
             
-            NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(attributes.Count+1, allocator);
+            int blendStream = -1;
+            if (sortBlendWeights) {
+                var blendCount = 0;
+                foreach (var mapBase in attributes) {
+                    switch (mapBase.attribute) {
+                        case VertexAttribute.BlendWeight:
+                        case VertexAttribute.BlendIndices:
+                            blendStream = mapBase.stream;
+                            blendCount++;                        
+                            break;
+                    }
+                }
+                sortBlendWeights = sortBlendWeights && blendCount==2;
+            }
+
+            var jobHandles = new NativeArray<JobHandle>(attributes.Count+(sortBlendWeights?2:1), allocator);
             
             jobHandles[0] = indicesJob.Schedule(decodeVerticesJobHandle);
             
+            var blendJobHandles = new NativeArray<JobHandle>( sortBlendWeights ? 2 : 0, allocator);
+
             int jobIndex = 1;
             foreach (var mapBase in attributes) {
                 var map = mapBase as AttributeMap;
@@ -343,8 +363,36 @@ namespace Draco {
                     };
                     jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
                 }
+
+                if (sortBlendWeights) {
+                    switch (mapBase.attribute) {
+                        case VertexAttribute.BlendWeight:
+                            blendJobHandles[0] = jobHandles[jobIndex];
+                            break;
+                        case VertexAttribute.BlendIndices:
+                            blendJobHandles[1] = jobHandles[jobIndex];
+                            break;
+                    }
+                }
+                
                 jobIndex++;
             }
+
+            if (sortBlendWeights) {
+                var blendJobHandle = JobHandle.CombineDependencies(blendJobHandles);
+                var sortJob = new SortBlendJob {
+                    result = dracoDecodeResult,
+#if DRACO_MESH_DATA                        
+                    mesh = mesh, 
+                    streamIndex = blendStream
+#else
+                    data = vData[blendStream].Reinterpret<BlendWeights>(1)
+#endif
+                };
+                jobHandles[jobIndex] = sortJob.Schedule(blendJobHandle);
+            }
+            blendJobHandles.Dispose();
+            
             var jobHandle = JobHandle.CombineDependencies(jobHandles);
             jobHandles.Dispose();
 
@@ -760,6 +808,60 @@ namespace Draco {
                 dracoTempResources[meshPtrIndex]=IntPtr.Zero;
                 dracoTempResources[decoderPtrIndex]=IntPtr.Zero;
                 dracoTempResources[bufferPtrIndex]=IntPtr.Zero;
+            }
+        }
+
+        
+        // TODO: make generic or uint index variant
+        struct BlendWeights {
+            public fixed float weight[4];
+            public fixed ushort index[4];
+        }
+        
+        [BurstCompile]
+        struct SortBlendJob : IJob {
+
+            [ReadOnly]
+            public NativeArray<int> result;
+            
+#if DRACO_MESH_DATA
+            public Mesh.MeshData mesh;
+            [ReadOnly]
+            public int streamIndex;
+#else
+            public NativeArray<BlendWeights> data;
+#endif
+            public void Execute() {
+                if (result[0]<0) {
+                    return;
+                }
+                
+#if DRACO_MESH_DATA
+                var data = mesh.GetVertexData<BlendWeights>(streamIndex);
+#endif
+
+                for (var i = 0; i < data.Length; i++) {
+                    var b = data[i];
+
+                    for (var x = 0; x < 3; x++) {
+                        for (var y = x+1; y < 4; y++) {
+                            if (b.weight[x] < b.weight[y]) {
+                                // (b.weight[x], b.weight[y]) = (b.weight[y], b.weight[x]);
+                                // (b.index[x], b.index[y]) = (b.index[y], b.index[x]);
+
+                                var tmpWeight = b.weight[x];
+                                b.weight[x] = b.weight[y];
+                                b.weight[y] = tmpWeight;
+                                
+                                var tmpIndex = b.index[x];
+                                b.index[x] = b.index[y];
+                                b.index[y] = tmpIndex;
+                            }
+                        }
+                    }
+                    
+                    data[i] = b;
+                }
             }
         }
       
