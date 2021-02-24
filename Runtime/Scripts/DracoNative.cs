@@ -93,6 +93,7 @@ namespace Draco {
 
 #if DRACO_MESH_DATA
         Mesh.MeshData mesh;
+        int indicesCount;
 #else
         Mesh mesh;
         NativeArray<uint> indices;
@@ -344,7 +345,9 @@ namespace Draco {
             CalculateVertexParams(dracoMesh, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId, out calculateNormals);
             
             Profiler.BeginSample("SetParameters");
-#if !DRACO_MESH_DATA
+#if DRACO_MESH_DATA
+            indicesCount = dracoMesh->numFaces * 3;
+#else
             mesh = new Mesh();
 #endif
             mesh.SetIndexBufferParams(dracoMesh->numFaces*3, IndexFormat.UInt32);
@@ -385,18 +388,17 @@ namespace Draco {
 
             const MeshUpdateFlags flags = DracoMeshLoader.defaultMeshUpdateFlags;
 
-#if DRACO_MESH_DATA
-            var indices = mesh.GetIndexData<uint>();
-#else
+#if !DRACO_MESH_DATA
             for (var streamIndex = 0; streamIndex < streamCount; streamIndex++) {
                 mesh.SetVertexBufferData(vData[streamIndex], 0, 0, vData[streamIndex].Length, streamIndex, flags);
             }
 
             mesh.SetIndexBufferData(indices, 0, 0, indices.Length);
+            var indicesCount = indices.Length;
 #endif
 
             mesh.subMeshCount = 1;
-            mesh.SetSubMesh(0, new SubMeshDescriptor(0, indices.Length), flags);
+            mesh.SetSubMesh(0, new SubMeshDescriptor(0, indicesCount), flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
 
 #if DRACO_MESH_DATA
