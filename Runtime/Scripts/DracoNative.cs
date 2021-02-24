@@ -25,6 +25,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
@@ -785,6 +786,7 @@ namespace Draco {
                 case AttributeType.COLOR:
                     return VertexAttribute.Color;
                 case AttributeType.TEX_COORD:
+                    Assert.IsTrue(index<8);
                     return (VertexAttribute) ((int)VertexAttribute.TexCoord0+index);
                 default:
                     return null;
