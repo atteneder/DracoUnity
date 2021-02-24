@@ -82,8 +82,7 @@ namespace Draco {
         /// </summary>
         bool convertSpace;
 
-        Dictionary<VertexAttribute, AttributeMapBase> attributes;
-        int streamCount;
+        List<AttributeMapBase> attributes;
         int[] streamStrides;
         int[] streamMemberCount;
 
@@ -96,6 +95,7 @@ namespace Draco {
         int indicesCount;
 #else
         Mesh mesh;
+        int streamCount;
         NativeArray<uint> indices;
         NativeArray<byte>[] vData;
         byte*[] vDataPtr;
@@ -141,7 +141,8 @@ namespace Draco {
             )
         {
             Profiler.BeginSample("CalculateVertexParams");
-            attributes = new Dictionary<VertexAttribute, AttributeMapBase>();
+            attributes = new List<AttributeMapBase>();
+            var attributeTypes = new HashSet<VertexAttribute>();
             
             bool CreateAttributeMaps(AttributeType attributeType, int count, DracoMesh* draco) {
                 bool foundAttribute = false;
@@ -155,8 +156,7 @@ namespace Draco {
 #endif
                         continue;
                     }
-
-                    if (attributes.ContainsKey(type.Value)) {
+                    if (attributeTypes.Contains(type.Value)) {
 #if UNITY_EDITOR
                         // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
                         Debug.LogWarning($"Multiple {type.Value} attributes!");
@@ -168,9 +168,9 @@ namespace Draco {
                     if (GetAttributeByType(draco, attributeType, i, &attribute)) {
                         var format = GetVertexAttributeFormat((DataType)attribute->dataType);
                         if (!format.HasValue) { continue; }
-
-                        var map = new AttributeMap(attribute, format.Value, convertSpace && ConvertSpace(type.Value));
-                        attributes[type.Value] = map;
+                        var map = new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value));
+                        attributes.Add(map);
+                        attributeTypes.Add(type.Value);
                         foundAttribute = true;
                     }
                     else {
@@ -182,7 +182,7 @@ namespace Draco {
             }
             
             bool CreateAttributeMapById(VertexAttribute type, int id, DracoMesh* draco) {
-                if (attributes.ContainsKey(type)) {
+                if (attributeTypes.Contains(type)) {
 #if UNITY_EDITOR
                     // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
                     Debug.LogWarning($"Multiple {type} attributes!");
@@ -195,50 +195,75 @@ namespace Draco {
                     var format = GetVertexAttributeFormat((DataType)attribute->dataType);
                     if (!format.HasValue) { return false; }
 
-                    var map = new AttributeMap(attribute, format.Value, convertSpace && ConvertSpace(type));
-                    attributes[type] = map;
+                    var map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
+                    attributes.Add(map);
+                    attributeTypes.Add(type);
                     return true;
                 }
                 return false;
             }
 
+            // Vertex attributes are added in the order defined here:
+            // https://docs.unity3d.com/2020.1/Documentation/ScriptReference/Rendering.VertexAttributeDescriptor.html
+            //
             CreateAttributeMaps(AttributeType.POSITION, 1, dracoMesh);
             var hasNormals = CreateAttributeMaps(AttributeType.NORMAL, 1, dracoMesh);
             calculateNormals = !hasNormals && requireNormals;
             if (calculateNormals) {
                 calculateNormals = true;
-                attributes[VertexAttribute.Normal] = new CalculatedAttributeMap(VertexAttributeFormat.Float32, 3, 4 );
+                attributes.Add(new CalculatedAttributeMap(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, 4 ));
             }
             if (requireTangents) {
-                attributes[VertexAttribute.Tangent] = new CalculatedAttributeMap(VertexAttributeFormat.Float32, 4, 4 );
+                attributes.Add(new CalculatedAttributeMap(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 4 ));
             }
             CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
             var hasTexCoords = CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
 
+            var hasBlend = false;
             if (weightsAttributeId >= 0) {
-                CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh);
+                hasBlend |= CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh);
             }
             if (jointsAttributeId >= 0) {
-                CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh);
+                hasBlend |= CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh);
             }
             
             streamStrides = new int[maxStreamCount];
             streamMemberCount = new int[maxStreamCount];
-            int streamIndex = -1;
-            foreach (var pair in attributes) {
-                // Naive stream assignment:
-                // First 3 attributes get a dedicated stream (#1,#2 and #3 respectivly)
-                // 4th and following get assigned to stream #4
-                // TODO: Make smarter stream assignment decision
-                if (streamIndex < maxStreamCount-1) { streamIndex++; }
-                var attributeMap = pair.Value;
+            var streamIndex = 0;
+            foreach (var attributeMap in attributes) {
+                // Stream assignment:
+                // Positions get a dedicated stream (0)
+                // The rest lands on stream 1
+                
+                // If blend weights or indices are present, they land on stream 1
+                // while the rest is combined in stream 0
+                
+                switch (attributeMap.attribute) {
+                    case VertexAttribute.Position:
+                        // Attributes that define/change the position go to stream 0
+                        streamIndex = 0;
+                        break;
+                    default:
+                        // The rest to stream 1, but not if blend weights/joints are present
+                        // In this case putting everything in stream 0 (except blend weights/joints) proved to work 
+                        streamIndex = hasBlend ? 0 : 1;
+                        break;
+                    case VertexAttribute.BlendWeight:
+                    case VertexAttribute.BlendIndices:
+                        // Special case: blend weights/joints always have a special stream
+                        streamIndex = 1;
+                        break;
+                }
+#if !DRACO_MESH_DATA
+                streamCount = Mathf.Max(streamCount, streamIndex+1);
+#endif
                 var elementSize = attributeMap.elementSize;
                 attributeMap.offset = streamStrides[streamIndex];
                 attributeMap.stream = streamIndex;
                 streamStrides[streamIndex] += elementSize;
                 streamMemberCount[streamIndex]++;
             }
-            streamCount = streamIndex+1;
+            attributes.Sort();
             Profiler.EndSample(); // CalculateVertexParams
         }
 
@@ -283,8 +308,8 @@ namespace Draco {
             jobHandles[0] = indicesJob.Schedule(decodeVerticesJobHandle);
             
             int jobIndex = 1;
-            foreach (var pair in attributes) {
-                AttributeMap map = pair.Value as AttributeMap;
+            foreach (var mapBase in attributes) {
+                var map = mapBase as AttributeMap;
                 if(map == null) continue;
                 if (streamMemberCount[map.stream] > 1) {
                     var job = new GetDracoDataInterleavedJob() {
@@ -352,9 +377,8 @@ namespace Draco {
 #endif
             mesh.SetIndexBufferParams(dracoMesh->numFaces*3, IndexFormat.UInt32);
             var vertexParams = new List<VertexAttributeDescriptor>(attributes.Count);
-            foreach (var pair in attributes) {
-                var map = pair.Value;
-                vertexParams.Add(new VertexAttributeDescriptor(pair.Key, map.format, map.numComponents, map.stream));
+            foreach (var map in attributes) {
+                vertexParams.Add(map.GetVertexAttributeDescriptor());
             }
             mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
 #if !DRACO_MESH_DATA
@@ -379,7 +403,7 @@ namespace Draco {
             
             Profiler.BeginSample("PopulateMeshData");
             
-            foreach (var map in attributes.Values) {
+            foreach (var map in attributes) {
                 map.Dispose();
             }
             attributes = null;
@@ -490,13 +514,15 @@ namespace Draco {
         [DllImport ("dracodec_unity")] unsafe static extern bool GetAttributeData(
             DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip);
 
-        abstract class AttributeMapBase {
+        abstract class AttributeMapBase : IComparable<AttributeMapBase> {
+            readonly public VertexAttribute attribute;
             public VertexAttributeFormat format;
             public int offset;
             public int stream;
             public bool flip;
         
-            public AttributeMapBase (VertexAttributeFormat format) {
+            public AttributeMapBase (VertexAttribute attribute, VertexAttributeFormat format) {
+                this.attribute = attribute;
                 this.format = format;
                 offset = 0;
                 stream = 0;
@@ -506,13 +532,23 @@ namespace Draco {
             public abstract int elementSize { get; }
 
             public virtual void Dispose() {}
+
+            public VertexAttributeDescriptor GetVertexAttributeDescriptor() {
+                return new VertexAttributeDescriptor(attribute,format,numComponents,stream);
+            }
+
+            public int CompareTo(AttributeMapBase b) {
+                var result = stream.CompareTo(b.stream);
+                if (result == 0) result = offset.CompareTo(b.offset);
+                return result;
+            }
         }
         
         class AttributeMap : AttributeMapBase {
             public DracoAttribute* dracoAttribute;
             public bool convertSpace = false;
 
-            public AttributeMap (DracoAttribute* dracoAttribute, VertexAttributeFormat format, bool convertSpace) : base(format) {
+            public AttributeMap (DracoAttribute* dracoAttribute, VertexAttribute attribute, VertexAttributeFormat format, bool convertSpace) : base(attribute,format) {
                 this.dracoAttribute = dracoAttribute;
                 this.convertSpace = convertSpace;
             }
@@ -532,7 +568,7 @@ namespace Draco {
             public int m_numComponents;
             public int m_elementSize;
             
-            public CalculatedAttributeMap (VertexAttributeFormat format, int numComponents, int componentSize) : base(format) {
+            public CalculatedAttributeMap (VertexAttribute attribute, VertexAttributeFormat format, int numComponents, int componentSize) : base(attribute,format) {
                 m_numComponents = numComponents;
                 m_elementSize = componentSize * numComponents;
             }
