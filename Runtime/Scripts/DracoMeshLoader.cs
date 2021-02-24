@@ -109,21 +109,23 @@ namespace Draco {
         {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
 #if DRACO_MESH_DATA
-            using (var meshDataArray = Mesh.AllocateWritableMeshData(1)) {
-                var mesh = meshDataArray[0];
-                var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
-                UnsafeUtility.ReleaseGCObject(gcHandle);
-                if (!result.success) return null;
-                var unityMesh = new Mesh();
-                Mesh.ApplyAndDisposeWritableMeshData(meshDataArray,unityMesh,defaultMeshUpdateFlags);
-                if (result.calculateNormals) {
-                    unityMesh.RecalculateNormals();
-                }
-                if (requireTangents) {
-                    unityMesh.RecalculateTangents();
-                }
-                return unityMesh;
+            var meshDataArray = Mesh.AllocateWritableMeshData(1);
+            var mesh = meshDataArray[0];
+            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            UnsafeUtility.ReleaseGCObject(gcHandle);
+            if (!result.success) {
+                meshDataArray.Dispose();
+                return null;
             }
+            var unityMesh = new Mesh();
+            Mesh.ApplyAndDisposeWritableMeshData(meshDataArray,unityMesh,defaultMeshUpdateFlags);
+            if (result.calculateNormals) {
+                unityMesh.RecalculateNormals();
+            }
+            if (requireTangents) {
+                unityMesh.RecalculateTangents();
+            }
+            return unityMesh;
 #else
             var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
             UnsafeUtility.ReleaseGCObject(gcHandle);
