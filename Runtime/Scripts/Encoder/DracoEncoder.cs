@@ -51,13 +51,23 @@ namespace Draco.Encoder {
                 attrDatas[attribute.attribute] = attrData;
             }
 
-            var vertexBufferPtrs = new IntPtr[DracoNative.maxStreamCount];
+            var streamCount = 1;
             for (var stream = 0; stream < strides.Length; stream++) {
                 var stride = strides[stream];
                 if(stride<=0) continue;
-                vertexBufferPtrs[stream] = mesh.GetNativeVertexBufferPtr(stream);
+                streamCount = stream + 1;
             }
 
+            var dataArray = Mesh.AcquireReadOnlyMeshData(mesh);
+            var data = dataArray[0];
+            
+            var vData = new NativeArray<byte>[streamCount];
+            var vDataPtr = new IntPtr[streamCount];
+            for (var stream = 0; stream < streamCount; stream++) {
+                vData[stream] = data.GetVertexData<byte>(stream);
+                vDataPtr[stream] = (IntPtr) vData[stream].GetUnsafeReadOnlyPtr();
+            }
+            
             for (int submeshIndex = 0; submeshIndex < mesh.subMeshCount; submeshIndex++) {
 
                 var submesh = mesh.GetSubMesh(submeshIndex);
@@ -81,24 +91,31 @@ namespace Draco.Encoder {
                     // Debug.Log($"attr {attribute}: {dimension} x {format}");
                     attributeIds[attribute] = DracoMeshAddAttribute(dracoMesh, GetAttributeType(attribute),GetDataType(format),dimension);
                     
+                    var baseAddr = vDataPtr[attrData.stream] + attrData.offset;
+                    
+                    var stride = strides[attrData.stream];
+                    
                     for (int faceId = 0; faceId < faceCount; faceId++) {
                         var index0 = indices[faceId * 3];
                         var index1 = indices[faceId * 3 + 1];
                         var index2 = indices[faceId * 3 + 2];
-                        var baseAddr = vertexBufferPtrs[attrData.stream] + attrData.offset;
-                        var stride = strides[attrData.stream];
                         var dataPtr0 = baseAddr + stride * index0;
-                        var dataPtr1 = baseAddr + stride * index0;
-                        var dataPtr2 = baseAddr + stride * index0;
+                        var dataPtr1 = baseAddr + stride * index1;
+                        var dataPtr2 = baseAddr + stride * index2;
                         DracoMeshAddFaceValues(dracoMesh, faceId, attributeIds[attribute], dimension, dataPtr0, dataPtr1, dataPtr2);
                     }
                 }
                 
-                DracoMeshFinalize(dracoMesh, out var dracoBuffer, out var data, out var size);
+                DracoMeshFinalize(dracoMesh, out var dracoBuffer, out var encodedData, out var size);
                 result[submeshIndex] = new NativeArray<byte>(size, Allocator.Persistent);
-                UnsafeUtility.MemCpy(result[submeshIndex].GetUnsafePtr(), data, size);
+                UnsafeUtility.MemCpy(result[submeshIndex].GetUnsafePtr(), encodedData, size);
                 ReleaseDracoMeshBuffer(dracoBuffer);
             }
+            
+            for (var stream = 0; stream < streamCount; stream++) {
+                vData[stream].Dispose();
+            }
+            dataArray.Dispose();
             
             return result;
         }
