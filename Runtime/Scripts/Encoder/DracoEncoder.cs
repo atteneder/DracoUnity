@@ -105,8 +105,16 @@ namespace Draco.Encoder {
                         DracoMeshAddFaceValues(dracoMesh, faceId, attributeIds[attribute], dimension, dataPtr0, dataPtr1, dataPtr2);
                     }
                 }
-                
-                DracoMeshFinalize(dracoMesh, out var dracoBuffer, out var encodedData, out var size);
+
+                DracoMeshCreateEncoder(dracoMesh, out var meshPtr, out var encoderPtr);
+
+                foreach (var pair in attrDatas) {
+                    var attribute = pair.Key;
+                    if(attribute == VertexAttribute.BlendIndices) continue;
+                    DracoMeshSetAttributeQuantization(encoderPtr, attributeIds[attribute], GetDefaultQuantization(attribute));
+                }
+
+                DracoMeshFinalize(dracoMesh, encoderPtr, meshPtr, out var dracoBuffer, out var encodedData, out var size);
                 result[submeshIndex] = new NativeArray<byte>(size, Allocator.Persistent);
                 UnsafeUtility.MemCpy(result[submeshIndex].GetUnsafePtr(), encodedData, size);
                 ReleaseDracoMeshBuffer(dracoBuffer);
@@ -201,11 +209,36 @@ namespace Draco.Encoder {
                     throw new ArgumentOutOfRangeException(nameof(format), format, null);
             }
         }
+
+        static int GetDefaultQuantization(VertexAttribute attribute) {
+            switch (attribute) {
+                case VertexAttribute.Position:
+                    return 14;
+                case VertexAttribute.Normal:
+                case VertexAttribute.Tangent:
+                    return 10;
+                case VertexAttribute.Color:
+                case VertexAttribute.BlendWeight:
+                    return 8;
+                default:
+                    return 12;
+            }
+        }
         
-        [DllImport ("dracoenc_unity")] unsafe static extern void* CreateDracoMeshEncoder(int faceCount);
-        [DllImport ("dracoenc_unity")] unsafe static extern int DracoMeshAddAttribute(void * dracoMesh, AttributeType attributeType, DataType dataType, int numComponents);
-        [DllImport ("dracoenc_unity")] unsafe static extern void DracoMeshAddFaceValues(void * dracoMesh, int faceIndex, int attributeId, int numComponents, IntPtr data0, IntPtr data1, IntPtr data2);
-        [DllImport ("dracoenc_unity")] unsafe static extern void DracoMeshFinalize(void * dracoMesh, out void* dracoBuffer, out void *result, out int size);
-        [DllImport ("dracoenc_unity")] unsafe static extern void ReleaseDracoMeshBuffer(void * dracoBuffer);
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern void* CreateDracoMeshEncoder(int faceCount);
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern int DracoMeshAddAttribute(void * dracoMesh, AttributeType attributeType, DataType dataType, int numComponents);
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern void DracoMeshAddFaceValues(void * dracoMesh, int faceIndex, int attributeId, int numComponents, IntPtr data0, IntPtr data1, IntPtr data2);
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern void DracoMeshCreateEncoder(void * dracoMesh, out void * meshPtr, out void * encoderPtr);
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern void DracoMeshSetAttributeQuantization(void * encoderPtr, int attributeId, int quantization);
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern void DracoMeshFinalize(void * dracoMesh, void* encoderPtr, void* meshPtr, out void* dracoBuffer, out void *result, out int size);
+        
+        [DllImport ("dracoenc_unity")]
+        unsafe static extern void ReleaseDracoMeshBuffer(void * dracoBuffer);
     }
 }
