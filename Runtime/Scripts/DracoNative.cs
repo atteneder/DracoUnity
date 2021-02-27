@@ -65,6 +65,12 @@ namespace Draco {
     
     unsafe internal class DracoNative {
         
+#if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
+        const string DRACODEC_UNITY_LIB = "__Internal";
+#elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR
+        const string DRACODEC_UNITY_LIB = "dracodec_unity";
+#endif
+        
         public const int maxStreamCount = 4;
         
         /// <summary>
@@ -466,52 +472,52 @@ namespace Draco {
         }
 
         // Release data associated with DracoMesh.
-        [DllImport ("dracodec_unity")] unsafe static extern void ReleaseDracoMesh(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern void ReleaseDracoMesh(
             DracoMesh**mesh);
         // Release data associated with DracoAttribute.
-        [DllImport ("dracodec_unity")] unsafe static extern void
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern void
             ReleaseDracoAttribute(DracoAttribute**attr);
         // Release attribute data.
-        [DllImport ("dracodec_unity")] unsafe static extern void ReleaseDracoData(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern void ReleaseDracoData(
             DracoData**data);
 
         // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
         // must be null. The returned mesh must released with ReleaseDracoMesh.
-        [DllImport ("dracodec_unity")] unsafe static extern int DecodeDracoMeshStep1(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern int DecodeDracoMeshStep1(
             byte* buffer, int length, DracoMesh**mesh, void**decoder, void** decoderBuffer);
         
         // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
         // must be null. The returned mesh must released with ReleaseDracoMesh.
-        [DllImport ("dracodec_unity")] unsafe static extern int DecodeDracoMeshStep2(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern int DecodeDracoMeshStep2(
             DracoMesh**mesh, void* decoder, void* decoderBuffer);
         
         // Returns the DracoAttribute at index in mesh. On input, attribute must be
         // null. The returned attr must be released with ReleaseDracoAttribute.
-        [DllImport ("dracodec_unity")] unsafe static extern bool GetAttribute(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttribute(
             DracoMesh* mesh, int index, DracoAttribute**attr);
         // Returns the DracoAttribute of type at index in mesh. On input, attribute
         // must be null. E.g. If the mesh has two texture coordinates then
         // GetAttributeByType(mesh, AttributeType.TEX_COORD, 1, &attr); will return
         // the second TEX_COORD attribute. The returned attr must be released with
         // ReleaseDracoAttribute.
-        [DllImport ("dracodec_unity")] unsafe static extern bool GetAttributeByType(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttributeByType(
             DracoMesh* mesh, AttributeType type, int index, DracoAttribute**attr);
         // Returns the DracoAttribute with unique_id in mesh. On input, attribute
         // must be null.The returned attr must be released with
         // ReleaseDracoAttribute.
-        [DllImport ("dracodec_unity")] unsafe static extern bool
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool
             GetAttributeByUniqueId(DracoMesh* mesh, int unique_id,
                 DracoAttribute**attr);
 
         // Returns an array of indices as well as the type of data in data_type. On
         // input, indices must be null. The returned indices must be released with
         // ReleaseDracoData.
-        [DllImport ("dracodec_unity")] unsafe static extern bool GetMeshIndices(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetMeshIndices(
             DracoMesh* mesh, DracoData**indices, bool flip);
         // Returns an array of attribute data as well as the type of data in
         // data_type. On input, data must be null. The returned data must be
         // released with ReleaseDracoData.
-        [DllImport ("dracodec_unity")] unsafe static extern bool GetAttributeData(
+        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttributeData(
             DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip);
 
         abstract class AttributeMapBase : IComparable<AttributeMapBase> {
