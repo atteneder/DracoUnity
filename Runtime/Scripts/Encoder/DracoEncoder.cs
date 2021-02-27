@@ -32,7 +32,7 @@ namespace Draco.Encoder {
         }
 
         public static unsafe NativeArray<byte>[] EncodeMesh(Mesh unityMesh) {
-
+#if UNITY_2020_1_OR_NEWER
             if (!unityMesh.isReadable) return null;
             
             var mesh = unityMesh;
@@ -126,6 +126,10 @@ namespace Draco.Encoder {
             dataArray.Dispose();
             
             return result;
+#else
+            Debug.LogError("Draco Encoding only works on Unity 2020.1 or newer");
+            return null;
+#endif
         }
 
         static DataType GetDataType(VertexAttributeFormat format) {
