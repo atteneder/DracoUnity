@@ -134,13 +134,7 @@ namespace Draco.Encoder {
             }
             
             var mesh = unityMesh;
-
-            
-            
-            Debug.Log($"posQ for {mesh.name} is {positionQuantization}");
-            
             var result = new NativeArray<byte>[mesh.subMeshCount];
-            
             var vertexAttributes = mesh.GetVertexAttributes();
 
             var strides = new int[DracoNative.maxStreamCount];
