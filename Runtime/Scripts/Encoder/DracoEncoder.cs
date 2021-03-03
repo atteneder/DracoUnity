@@ -37,11 +37,97 @@ namespace Draco.Encoder {
             public int offset;
         }
 
-        public static unsafe NativeArray<byte>[] EncodeMesh(Mesh unityMesh) {
+        /// <summary>
+        /// Calculates the idea quantization value based on the largest dimension and desired precision
+        /// </summary>
+        /// <param name="largestDimension">Length of the largest dimension (width/depth/height)</param>
+        /// <param name="precision">Desired minimum precision in world units</param>
+        /// <returns></returns>
+        static int GetIdealQuantization(float largestDimension, float precision) {
+            var value = Mathf.RoundToInt(largestDimension / precision);
+            var mostSignificantBit = -1;
+            while (value > 0) {
+                mostSignificantBit++;
+                value >>= 1;
+            }
+            return Mathf.Clamp(mostSignificantBit,4,24);
+        }
+
+        /// <summary>
+        /// Applies Draco compression to a given mesh and returns the compressed mesh data (one per submesh)
+        /// The quality and quantization parameters are calculated from the mesh's bounds, its worldScale and desired precision.
+        /// The quantization paramters help to find a balance between compressed size and quality / precision.
+        /// </summary>
+        /// <param name="unityMesh">Input mesh</param>
+        /// <param name="worldScale">Local-to-world scale this mesh is present in the scene</param>
+        /// <param name="precision">Desired minimum precision in world units</param>
+        /// <param name="normalQuantization">Normal quantization</param>
+        /// <param name="texCoordQuantization">Texture coordinate quantization</param>
+        /// <param name="colorQuantization">Color quantization</param>
+        /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
+        /// <returns></returns>
+        public static unsafe NativeArray<byte>[] EncodeMesh(
+            Mesh unityMesh,
+            Vector3 worldScale,
+            float precision = .001f,
+            int normalQuantization = 10,
+            int texCoordQuantization = 12,
+            int colorQuantization = 8,
+            int genericQuantization = 12
+            )
+        {
+
+            if (!unityMesh.isReadable) {
+                Debug.LogError("Mesh is not readable");
+                return null;
+            }
+            
+            var bounds = unityMesh.bounds;
+            var scale = new Vector3(Mathf.Abs(worldScale.x), Mathf.Abs(worldScale.y), Mathf.Abs(worldScale.z));
+            var maxSize = Mathf.Max(bounds.extents.x*scale.x, bounds.extents.y*scale.y, bounds.extents.z*scale.z) * 2;
+            var positionQuantization = GetIdealQuantization(maxSize, precision);
+
+            return EncodeMesh(
+                unityMesh,
+                positionQuantization,
+                normalQuantization,
+                texCoordQuantization,
+                colorQuantization,
+                genericQuantization
+                );
+        }
+        
+        /// <summary>
+        /// Applies Draco compression to a given mesh and returns the compressed mesh data (one per submesh)
+        /// The quantization paramters help to find a balance between compressed size and quality / precision.
+        /// </summary>
+        /// <param name="unityMesh">Input mesh</param>
+        /// <param name="positionQuantization">Vertex position quantization</param>
+        /// <param name="normalQuantization">Normal quantization</param>
+        /// <param name="texCoordQuantization">Texture coordinate quantization</param>
+        /// <param name="colorQuantization">Color quantization</param>
+        /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
+        /// <returns></returns>
+        public static unsafe NativeArray<byte>[] EncodeMesh(
+            Mesh unityMesh,
+            int positionQuantization = 14,
+            int normalQuantization = 10,
+            int texCoordQuantization = 12,
+            int colorQuantization = 8,
+            int genericQuantization = 12
+            )
+        {
 #if UNITY_2020_1_OR_NEWER
-            if (!unityMesh.isReadable) return null;
+            if (!unityMesh.isReadable) {
+                Debug.LogError("Mesh is not readable");
+                return null;
+            }
             
             var mesh = unityMesh;
+
+            
+            
+            Debug.Log($"posQ for {mesh.name} is {positionQuantization}");
             
             var result = new NativeArray<byte>[mesh.subMeshCount];
             
@@ -107,11 +193,11 @@ namespace Draco.Encoder {
                 dracoEncoderSetCompressionSpeed(dracoEncoder, 0);
                 dracoEncoderSetQuantizationBits(
                     dracoEncoder,
-                    GetDefaultQuantization(VertexAttribute.Position),
-                    GetDefaultQuantization(VertexAttribute.Normal),
-                    GetDefaultQuantization(VertexAttribute.TexCoord0),
-                    GetDefaultQuantization(VertexAttribute.Color),
-                    12
+                    Mathf.Clamp(positionQuantization,4,24),
+                    Mathf.Clamp(normalQuantization,4,24),
+                    Mathf.Clamp(texCoordQuantization,4,24),
+                    Mathf.Clamp(colorQuantization,4,24),
+                    Mathf.Clamp(genericQuantization,4,24)
                 );
 
                 dracoEncoderEncode(dracoEncoder, false);
@@ -214,21 +300,6 @@ namespace Draco.Encoder {
                     return sizeof(int);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(format), format, null);
-            }
-        }
-
-        static int GetDefaultQuantization(VertexAttribute attribute) {
-            switch (attribute) {
-                case VertexAttribute.Position:
-                    return 14;
-                case VertexAttribute.Normal:
-                case VertexAttribute.Tangent:
-                    return 10;
-                case VertexAttribute.Color:
-                case VertexAttribute.BlendWeight:
-                    return 8;
-                default:
-                    return 12;
             }
         }
         
