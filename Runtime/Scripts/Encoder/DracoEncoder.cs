@@ -61,6 +61,7 @@ namespace Draco.Encoder {
         /// <param name="unityMesh">Input mesh</param>
         /// <param name="worldScale">Local-to-world scale this mesh is present in the scene</param>
         /// <param name="precision">Desired minimum precision in world units</param>
+        /// <param name="speedLevel">(De)compression speed level. 0 means slow and small. 10 is fastest.</param>
         /// <param name="normalQuantization">Normal quantization</param>
         /// <param name="texCoordQuantization">Texture coordinate quantization</param>
         /// <param name="colorQuantization">Color quantization</param>
@@ -70,6 +71,7 @@ namespace Draco.Encoder {
             Mesh unityMesh,
             Vector3 worldScale,
             float precision = .001f,
+            int speedLevel = 4,
             int normalQuantization = 10,
             int texCoordQuantization = 12,
             int colorQuantization = 8,
@@ -89,6 +91,7 @@ namespace Draco.Encoder {
 
             return EncodeMesh(
                 unityMesh,
+                speedLevel,
                 positionQuantization,
                 normalQuantization,
                 texCoordQuantization,
@@ -102,6 +105,7 @@ namespace Draco.Encoder {
         /// The quantization paramters help to find a balance between compressed size and quality / precision.
         /// </summary>
         /// <param name="unityMesh">Input mesh</param>
+        /// <param name="speedLevel">(De)compression speed level. 0 means slow and small. 10 is fastest.</param>
         /// <param name="positionQuantization">Vertex position quantization</param>
         /// <param name="normalQuantization">Normal quantization</param>
         /// <param name="texCoordQuantization">Texture coordinate quantization</param>
@@ -110,6 +114,7 @@ namespace Draco.Encoder {
         /// <returns></returns>
         public static unsafe NativeArray<byte>[] EncodeMesh(
             Mesh unityMesh,
+            int speedLevel = 4,
             int positionQuantization = 14,
             int normalQuantization = 10,
             int texCoordQuantization = 12,
@@ -190,7 +195,7 @@ namespace Draco.Encoder {
                 UnsafeUtility.ReleaseGCObject(gcHandle);
 
                 // For both encoding and decoding (0 = slow and best compression; 10 = fast) 
-                dracoEncoderSetCompressionSpeed(dracoEncoder, 0);
+                dracoEncoderSetCompressionSpeed(dracoEncoder, Mathf.Clamp(speedLevel,0,10));
                 dracoEncoderSetQuantizationBits(
                     dracoEncoder,
                     Mathf.Clamp(positionQuantization,4,24),
