@@ -80,14 +80,14 @@ This project is a fork of the [existing Unity integration](https://github.com/go
 
 ### Differences
 
-Draco 3D Data Compression Unity Package assumes Draco meshes to be right-handed Y-up coordinates and converts them to Unity's left-handed Y-up by flipping the Z-axis.
-
-### Improvements
-
+- Encoding support
 - Can be integrated into Projects easily via Package Manager
 - Is magnitudes faster due to
   - Bulk memory copies instead of per vertex/index data copy
   - Multi-threaded via C# Job system
+  - Burst compiler
+  - Using Unity's Advanced Mesh API
+- Supports coordinate space conversion (from right-handed Y-up to Unity's left-handed Y-up by flipping the Z-axis; optional; required in glTF context)
 - Supports single meshes with more than 65536 vertices (old split algorithm was broken)
 - Supports loading joint index and joint weights for skinning
 - Corrects tangents by re-calculating them if necessary
