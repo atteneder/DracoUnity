@@ -6,7 +6,7 @@
 
 Unity package that integrates the [Draco 3D data compression library](https://google.github.io/draco) within Unity.
 
-![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/master/Images/bunnies.png "Lots of Stanford bunny meshes loaded via Draco 3D Data Compression Unity Package")
+![Screenshot of loaded bunny meshes](https://github.com/atteneder/DracoUnityDemo/raw/main/Images/bunnies.png "Lots of Stanford bunny meshes loaded via Draco 3D Data Compression Unity Package")
 
 Following build targets are supported
 
