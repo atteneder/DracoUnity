@@ -49,13 +49,13 @@ public static class DracoMeshEncoder
         if (dracoData.Length > 1) {
             var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-{0}.drc" : $"{mesh.name}-submesh-{{0}}.drc";
             for (var submesh = 0; submesh < dracoData.Length; submesh++) {
-                File.WriteAllBytes(Path.Combine(directory,string.Format(filename,submesh)),dracoData[submesh].ToArray());
+                File.WriteAllBytes(Path.Combine(directory,string.Format(filename,submesh)),dracoData[submesh].data.ToArray());
                 dracoData[submesh].Dispose();
             }
         }
         else {
             var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh.drc" : $"{mesh.name}.drc";
-            File.WriteAllBytes(Path.Combine(directory, filename), dracoData[0].ToArray());
+            File.WriteAllBytes(Path.Combine(directory, filename), dracoData[0].data.ToArray());
             dracoData[0].Dispose();
         }
     }

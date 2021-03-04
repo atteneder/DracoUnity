@@ -23,6 +23,16 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Draco.Encoder {
+
+    public struct EncodeResult {
+        public uint indexCount;
+        public uint vertexCount;
+        public NativeArray<byte> data;
+
+        public void Dispose() {
+            data.Dispose();
+        }
+    }
     
     public static class DracoEncoder {
         
@@ -54,7 +64,7 @@ namespace Draco.Encoder {
         }
 
         /// <summary>
-        /// Applies Draco compression to a given mesh and returns the compressed mesh data (one per submesh)
+        /// Applies Draco compression to a given mesh and returns the encoded result (one per submesh)
         /// The quality and quantization parameters are calculated from the mesh's bounds, its worldScale and desired precision.
         /// The quantization paramters help to find a balance between compressed size and quality / precision.
         /// </summary>
@@ -68,7 +78,7 @@ namespace Draco.Encoder {
         /// <param name="colorQuantization">Color quantization</param>
         /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
         /// <returns></returns>
-        public static unsafe NativeArray<byte>[] EncodeMesh(
+        public static unsafe EncodeResult[] EncodeMesh(
             Mesh unityMesh,
             Vector3 worldScale,
             float precision = .001f,
@@ -104,8 +114,8 @@ namespace Draco.Encoder {
         }
         
         /// <summary>
-        /// Applies Draco compression to a given mesh and returns the compressed mesh data (one per submesh)
-        /// The quantization paramters help to find a balance between compressed size and quality / precision.
+        /// Applies Draco compression to a given mesh and returns the encoded result (one per submesh)
+        /// The quantization paramters help to find a balance between encoded size and quality / precision.
         /// </summary>
         /// <param name="unityMesh">Input mesh</param>
         /// <param name="encodingSpeed">Encoding speed level. 0 means slow and small. 10 is fastest.</param>
@@ -116,7 +126,7 @@ namespace Draco.Encoder {
         /// <param name="colorQuantization">Color quantization</param>
         /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
         /// <returns></returns>
-        public static unsafe NativeArray<byte>[] EncodeMesh(
+        public static unsafe EncodeResult[] EncodeMesh(
             Mesh unityMesh,
             int encodingSpeed = 0,
             int decodingSpeed = 4,
@@ -134,7 +144,7 @@ namespace Draco.Encoder {
             }
             
             var mesh = unityMesh;
-            var result = new NativeArray<byte>[mesh.subMeshCount];
+            var result = new EncodeResult[mesh.subMeshCount];
             var vertexAttributes = mesh.GetVertexAttributes();
 
             var strides = new int[DracoNative.maxStreamCount];
@@ -207,8 +217,15 @@ namespace Draco.Encoder {
                 dracoEncoderEncode(dracoEncoder, false);
                 
                 var dracoDataSize = (int) dracoEncoderGetByteLength(dracoEncoder);
-                result[submeshIndex] = new NativeArray<byte>(dracoDataSize, Allocator.Persistent);
-                dracoEncoderCopy(dracoEncoder,result[submeshIndex].GetUnsafePtr());
+                
+                var dracoData = new NativeArray<byte>(dracoDataSize, Allocator.Persistent);
+                dracoEncoderCopy(dracoEncoder,dracoData.GetUnsafePtr());
+                
+                result[submeshIndex] = new EncodeResult {
+                    indexCount = dracoEncoderGetEncodedIndexCount(dracoEncoder),
+                    vertexCount = dracoEncoderGetEncodedVertexCount(dracoEncoder),
+                    data = dracoData
+                };
                 
                 dracoEncoderRelease(dracoEncoder);
             }
