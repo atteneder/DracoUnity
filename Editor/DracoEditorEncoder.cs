@@ -127,7 +127,7 @@ namespace Draco.Editor {
                 meshDecoder = new GameObject("MeshDecoder").AddComponent<DracoDecoder>();
             }
 
-            directory ??= $"Assets/{k_CompressedMeshesDirName}";
+            directory = directory ?? $"Assets/{k_CompressedMeshesDirName}";
             if (!Directory.Exists(directory)) {
                 Directory.CreateDirectory(directory);
             }
