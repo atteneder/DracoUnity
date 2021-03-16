@@ -476,7 +476,8 @@ namespace Draco {
 #endif
 
             mesh.subMeshCount = 1;
-            mesh.SetSubMesh(0, new SubMeshDescriptor(0, indicesCount), flags);
+            var submeshDescriptor = new SubMeshDescriptor(0, indicesCount) { firstVertex = 0, baseVertex = 0, vertexCount = mesh.vertexCount };
+            mesh.SetSubMesh(0, submeshDescriptor, flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
 
 #if DRACO_MESH_DATA
