@@ -117,7 +117,7 @@ namespace Draco {
         // Mesh.SetBoneWeights after the Mesh was created.
         AttributeMap boneIndexMap;
         AttributeMap boneWeightMap;
-        bool hasBoneJob => boneIndexMap!=null && boneWeightMap!=null;
+        public bool hasBoneWeightData => boneIndexMap!=null && boneWeightMap!=null;
         public NativeArray<byte> bonesPerVertex;
         public NativeArray<BoneWeight1> boneWeights;
 #endregion BlendHack
@@ -364,7 +364,7 @@ namespace Draco {
             };
             var jobCount = attributes.Count + 1;
             
-            if (hasBoneJob) jobCount++;
+            if (hasBoneWeightData) jobCount++;
 
             var jobHandles = new NativeArray<JobHandle>(jobCount, allocator) {
                 [0] = indicesJob.Schedule(decodeVerticesJobHandle)
@@ -425,7 +425,7 @@ namespace Draco {
                 jobIndex++;
             }
 
-            if (hasBoneJob) {
+            if (hasBoneWeightData) {
                 // TODO: BLENDHACK;
                 var job = new GetDracoBonesJob() {
                     result = dracoDecodeResult,
@@ -485,7 +485,7 @@ namespace Draco {
             AllocateIndices(dracoMesh);
             AllocateVertexBuffers(dracoMesh);
 #endif
-            if (hasBoneJob) {
+            if (hasBoneWeightData) {
                 var boneCount = boneIndexMap.numComponents;
                 bonesPerVertex = new NativeArray<byte>(dracoMesh->numVertices, Allocator.Persistent);
                 boneWeights = new NativeArray<BoneWeight1>(dracoMesh->numVertices * boneCount, Allocator.Persistent);
@@ -525,7 +525,7 @@ namespace Draco {
             mesh.SetIndexBufferData(indices, 0, 0, indices.Length);
             var indicesCount = indices.Length;
 
-            if (hasBoneJob) {
+            if (hasBoneWeightData) {
                 mesh.SetBoneWeights(bonesPerVertex,boneWeights);
             }
 #endif
@@ -542,11 +542,8 @@ namespace Draco {
             foreach (var nativeArray in vData) {
                 nativeArray.Dispose();
             }
-            if (hasBoneJob) {
-                bonesPerVertex.Dispose();
-                boneWeights.Dispose();
-                boneIndexMap = null;
-                boneWeightMap = null;
+            if (hasBoneWeightData) {
+                DisposeBoneWeightData();
             }
             Profiler.EndSample();
 #endif
@@ -557,6 +554,17 @@ namespace Draco {
 #else
             return mesh;
 #endif
+        }
+
+        public void DisposeBoneWeightData() {
+#if !DRACO_MESH_DATA
+            // If MeshData is used, NativeArrays are passed to user and
+            // it becomes their responsibility to properly Dispose them.
+            bonesPerVertex.Dispose();
+            boneWeights.Dispose();
+#endif
+            boneIndexMap = null;
+            boneWeightMap = null;
         }
 
         // The order must be consistent with C++ interface.

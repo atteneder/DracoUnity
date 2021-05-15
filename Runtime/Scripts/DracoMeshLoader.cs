@@ -54,7 +54,37 @@ namespace Draco {
             /// They have to get calculated.
             /// </summary>
             public bool calculateNormals;
+            
+#if DRACO_MESH_DATA
+            /// <summary>
+            /// If the Draco file contained bone indices and bone weights,
+            /// this property is used to carry them over (since MeshData currently
+            /// provides no way to apply those values)
+            /// </summary>
+            public BoneWeightData boneWeightData;
+#endif
         }
+        
+#if DRACO_MESH_DATA
+        public class BoneWeightData : IDisposable {
+            NativeArray<byte> bonesPerVertex;
+            NativeArray<BoneWeight1> boneWeights;
+
+            public BoneWeightData(NativeArray<byte> bonesPerVertex, NativeArray<BoneWeight1> boneWeights) {
+                this.bonesPerVertex = bonesPerVertex;
+                this.boneWeights = boneWeights;
+            }
+
+            public void ApplyOnMesh(Mesh mesh) {
+                mesh.SetBoneWeights(bonesPerVertex,boneWeights);
+            }
+
+            public void Dispose() {
+                bonesPerVertex.Dispose();
+                boneWeights.Dispose();
+            }
+        }
+#endif
 
         public const MeshUpdateFlags defaultMeshUpdateFlags = MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontResetBoneBounds;
         
@@ -82,6 +112,10 @@ namespace Draco {
             }
             var unityMesh = new Mesh();
             Mesh.ApplyAndDisposeWritableMeshData(meshDataArray,unityMesh,defaultMeshUpdateFlags);
+            if (result.boneWeightData != null) {
+                result.boneWeightData.ApplyOnMesh(unityMesh);
+                result.boneWeightData.Dispose();
+            }
             if (result.calculateNormals) {
                 unityMesh.RecalculateNormals();
             }
@@ -273,6 +307,10 @@ namespace Draco {
             }
 #else
             result.success = dracoNative.PopulateMeshData();
+            if (result.success && dracoNative.hasBoneWeightData) {
+                result.boneWeightData = new BoneWeightData(dracoNative.bonesPerVertex, dracoNative.boneWeights);
+                dracoNative.DisposeBoneWeightData();
+            }
 #endif
             return result;
         }
