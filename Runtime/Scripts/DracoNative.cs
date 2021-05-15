@@ -196,7 +196,7 @@ namespace Draco {
                         continue;
                     }
 
-                    DracoAttribute* attribute;
+                    DracoAttribute* attribute = null;
                     if (GetAttributeByType(draco, attributeType, i, &attribute)) {
                         var format = GetVertexAttributeFormat((DataType)attribute->dataType);
                         if (!format.HasValue) { continue; }
