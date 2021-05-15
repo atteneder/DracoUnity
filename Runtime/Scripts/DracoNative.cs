@@ -848,6 +848,9 @@ namespace Draco {
             public byte* dstPtr;
 #endif
             public void Execute() {
+                if (result[0]<0) {
+                    return;
+                }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data, flip);
