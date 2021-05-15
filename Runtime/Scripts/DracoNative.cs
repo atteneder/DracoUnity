@@ -896,22 +896,75 @@ namespace Draco {
 
                 DracoData* indicesData = null;
                 GetAttributeData(dracoMesh, indicesAttribute, &indicesData, false);
+                var indicesDataType = (DataType)indicesData->dataType;
                 var indexSize = DataTypeSize((DataType)indicesData->dataType) * indicesAttribute->numComponents;
                 
                 DracoData* weightsData = null;
                 GetAttributeData(dracoMesh, weightsAttribute, &weightsData, false);
                 var weightSize = DataTypeSize((DataType)weightsData->dataType) * weightsAttribute->numComponents;
 
+                Func<IntPtr, int, int> indexValueConverter = null;
+                switch (indicesDataType) {
+                    case DataType.DT_INT8:
+                        indexValueConverter = GetIndexValueInt8;
+                        break;
+                    case DataType.DT_UINT8:
+                        indexValueConverter = GetIndexValueUInt8;
+                        break;
+                    case DataType.DT_INT16:
+                        indexValueConverter = GetIndexValueInt16;
+                        break;
+                    case DataType.DT_UINT16:
+                        indexValueConverter = GetIndexValueUInt16;
+                        break;
+                    case DataType.DT_INT32:
+                        indexValueConverter = GetIndexValueInt32;
+                        break;
+                    case DataType.DT_UINT32:
+                        indexValueConverter = GetIndexValueUInt32;
+                        break;
+                    default:
+                        Debug.LogError($"Unsupported indicesDataType {indicesDataType}");
+                        return;
+                }
+
                 for (var v = 0; v < dracoMesh->numVertices; v++) {
-                    bonesPerVertex[v] = indicesAttribute->numComponents;
-                    var indicesPtr = (byte*) (((byte*)indicesData->data) + (indexSize * v));
+                    bonesPerVertex[v] = (byte) indicesAttribute->numComponents;
+                    var indicesPtr = (IntPtr) (((byte*)indicesData->data) + (indexSize * v));
                     var weightsPtr = (float*) (((byte*)weightsData->data) + (weightSize * v));
                     for (var b = 0; b < indicesAttribute->numComponents; b++) {
-                        boneWeights[v * indicesAttribute->numComponents + b] = new BoneWeight1 { boneIndex = *(indicesPtr + b), weight = *(weightsPtr + b) };
+                        boneWeights[v * indicesAttribute->numComponents + b] = new BoneWeight1 {
+                            boneIndex = indexValueConverter(indicesPtr,b),
+                            weight = *(weightsPtr + b)
+                        };
                     }
                 }
                 ReleaseDracoData(&indicesData);
                 ReleaseDracoData(&weightsData);
+            }
+
+            static int GetIndexValueUInt8(IntPtr baseAddress, int index) {
+                return *((byte*)baseAddress+index);
+            }
+            
+            static int GetIndexValueInt8(IntPtr baseAddress, int index) {
+                return *(((sbyte*)baseAddress)+index);
+            }
+            
+            static int GetIndexValueUInt16(IntPtr baseAddress, int index) {
+                return *(((ushort*)baseAddress)+index);
+            }
+            
+            static int GetIndexValueInt16(IntPtr baseAddress, int index) {
+                return *(((short*)baseAddress)+index);
+            }
+            
+            static int GetIndexValueUInt32(IntPtr baseAddress, int index) {
+                return (int) *(((uint*)baseAddress)+index);
+            }
+            
+            static int GetIndexValueInt32(IntPtr baseAddress, int index) {
+                return *(((int*)baseAddress)+index);
             }
         }
       
