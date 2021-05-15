@@ -110,6 +110,17 @@ namespace Draco {
         byte*[] vDataPtr;
 #endif
 
+#region BlendHack
+        // TODO: BLENDHACK; Unity does not support setting bone weights and indices via new Mesh API
+        // https://fogbugz.unity3d.com/default.asp?1320869_7g7qeq40va98n6h6
+        // As a workaround we extract those attributes separately so they can be fed into
+        // Mesh.SetBoneWeights after the Mesh was created.
+        AttributeMap boneIndexMap;
+        AttributeMap boneWeightMap;
+        bool hasBoneJob => boneIndexMap!=null && boneWeightMap!=null;
+        public NativeArray<byte> bonesPerVertex;
+        public NativeArray<BoneWeight1> boneWeights;
+#endregion BlendHack
 
         public DracoNative(
 #if DRACO_MESH_DATA
@@ -202,7 +213,8 @@ namespace Draco {
                 return foundAttribute;
             }
             
-            bool CreateAttributeMapById(VertexAttribute type, int id, DracoMesh* draco) {
+            bool CreateAttributeMapById(VertexAttribute type, int id, DracoMesh* draco, out AttributeMap map) {
+                map = null;
                 if (attributeTypes.Contains(type)) {
 #if UNITY_EDITOR
                     // ReSharper disable once Unity.PerformanceCriticalCodeInvocation
@@ -216,8 +228,7 @@ namespace Draco {
                     var format = GetVertexAttributeFormat((DataType)attribute->dataType);
                     if (!format.HasValue) { return false; }
 
-                    var map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
-                    attributes.Add(map);
+                    map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
                     attributeTypes.Add(type);
                     return true;
                 }
@@ -242,10 +253,19 @@ namespace Draco {
 
             var hasBlend = false;
             if (weightsAttributeId >= 0) {
-                hasBlend |= CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh);
+                if (CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh, out var map)) {
+                    // BLENDHACK: Don't add bone weights, as they won't exist after Mesh.SetBoneWeights
+                    // attributes.Add(map);
+                    boneWeightMap = map;
+                    hasBlend = true;
+                }
             }
             if (jointsAttributeId >= 0) {
-                hasBlend |= CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh);
+                if (CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh, out var map)) {
+                    attributes.Add(map);
+                    boneIndexMap = map;
+                    hasBlend = true;
+                }
             }
             
             streamStrides = new int[maxStreamCount];
@@ -256,9 +276,12 @@ namespace Draco {
                 // Positions get a dedicated stream (0)
                 // The rest lands on stream 1
                 
-                // If blend weights or indices are present, they land on stream 1
+                // If blend weights or blend indices are present, they land on stream 1
                 // while the rest is combined in stream 0
-                
+                // TODO: BLENDHACK;  
+                // A potentially following Mesh.SetBoneWeights changes stream assignment again!
+                // Maybe it would be better to rebuild Unity's logic?
+
                 switch (attributeMap.attribute) {
                     case VertexAttribute.Position:
                         // Attributes that define/change the position go to stream 0
@@ -339,10 +362,14 @@ namespace Draco {
                 indices = indices
 #endif
             };
+            var jobCount = attributes.Count + 1;
             
-            NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(attributes.Count+1, allocator);
-            
-            jobHandles[0] = indicesJob.Schedule(decodeVerticesJobHandle);
+            if (hasBoneJob) jobCount++;
+
+            var jobHandles = new NativeArray<JobHandle>(jobCount, allocator) {
+                [0] = indicesJob.Schedule(decodeVerticesJobHandle)
+            };
+
 #if UNITY_EDITOR
             if (sync) {
                 jobHandles[0].Complete();
@@ -353,6 +380,11 @@ namespace Draco {
             foreach (var mapBase in attributes) {
                 var map = mapBase as AttributeMap;
                 if(map == null) continue;
+                
+                // BLENDHACK: skip blend indices here (done below)
+                // weights were removed from attributes before
+                if(map.attribute == VertexAttribute.BlendIndices) continue; // Blend
+                
                 if (streamMemberCount[map.stream] > 1) {
                     var job = new GetDracoDataInterleavedJob() {
                         result = dracoDecodeResult,
@@ -392,6 +424,20 @@ namespace Draco {
 #endif
                 jobIndex++;
             }
+
+            if (hasBoneJob) {
+                // TODO: BLENDHACK;
+                var job = new GetDracoBonesJob() {
+                    result = dracoDecodeResult,
+                    dracoTempResources = dracoTempResources,
+                    indicesAttribute = boneIndexMap.dracoAttribute,
+                    weightsAttribute = boneWeightMap.dracoAttribute,
+                    bonesPerVertex = bonesPerVertex,
+                    boneWeights = boneWeights
+                };
+                jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
+            }
+            
             var jobHandle = JobHandle.CombineDependencies(jobHandles);
             jobHandles.Dispose();
 
@@ -439,6 +485,11 @@ namespace Draco {
             AllocateIndices(dracoMesh);
             AllocateVertexBuffers(dracoMesh);
 #endif
+            if (hasBoneJob) {
+                var boneCount = boneIndexMap.numComponents;
+                bonesPerVertex = new NativeArray<byte>(dracoMesh->numVertices, Allocator.Persistent);
+                boneWeights = new NativeArray<BoneWeight1>(dracoMesh->numVertices * boneCount, Allocator.Persistent);
+            }
             Profiler.EndSample(); // SetParameters
             Profiler.EndSample(); // CreateMesh
         }
@@ -473,6 +524,10 @@ namespace Draco {
 
             mesh.SetIndexBufferData(indices, 0, 0, indices.Length);
             var indicesCount = indices.Length;
+
+            if (hasBoneJob) {
+                mesh.SetBoneWeights(bonesPerVertex,boneWeights);
+            }
 #endif
 
             mesh.subMeshCount = 1;
@@ -486,6 +541,12 @@ namespace Draco {
             indices.Dispose();
             foreach (var nativeArray in vData) {
                 nativeArray.Dispose();
+            }
+            if (hasBoneJob) {
+                bonesPerVertex.Dispose();
+                boneWeights.Dispose();
+                boneIndexMap = null;
+                boneWeightMap = null;
             }
             Profiler.EndSample();
 #endif
@@ -799,6 +860,55 @@ namespace Draco {
                     UnsafeUtility.MemCpy(dstPtr+(stride*v), ((byte*)data->data)+(elementSize*v), elementSize);
                 }
                 ReleaseDracoData(&data);
+            }
+        }
+        
+        [BurstCompile]
+        struct GetDracoBonesJob : IJob {
+            
+            [ReadOnly]
+            public NativeArray<int> result;
+            [ReadOnly]
+            public NativeArray<IntPtr> dracoTempResources;
+
+            [ReadOnly]
+            [NativeDisableUnsafePtrRestriction]
+            public DracoAttribute* indicesAttribute;
+            
+            [ReadOnly]
+            [NativeDisableUnsafePtrRestriction]
+            public DracoAttribute* weightsAttribute;
+            
+            [WriteOnly]
+            public NativeArray<byte> bonesPerVertex;
+            
+            [WriteOnly]
+            public NativeArray<BoneWeight1> boneWeights;
+            
+            public void Execute() {
+                if (result[0]<0) {
+                    return;
+                }
+                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
+
+                DracoData* indicesData = null;
+                GetAttributeData(dracoMesh, indicesAttribute, &indicesData, false);
+                var indexSize = DataTypeSize((DataType)indicesData->dataType) * indicesAttribute->numComponents;
+                
+                DracoData* weightsData = null;
+                GetAttributeData(dracoMesh, weightsAttribute, &weightsData, false);
+                var weightSize = DataTypeSize((DataType)weightsData->dataType) * weightsAttribute->numComponents;
+
+                for (var v = 0; v < dracoMesh->numVertices; v++) {
+                    bonesPerVertex[v] = indicesAttribute->numComponents;
+                    var indicesPtr = (byte*) (((byte*)indicesData->data) + (indexSize * v));
+                    var weightsPtr = (float*) (((byte*)weightsData->data) + (weightSize * v));
+                    for (var b = 0; b < indicesAttribute->numComponents; b++) {
+                        boneWeights[v * indicesAttribute->numComponents + b] = new BoneWeight1 { boneIndex = *(indicesPtr + b), weight = *(weightsPtr + b) };
+                    }
+                }
+                ReleaseDracoData(&indicesData);
+                ReleaseDracoData(&weightsData);
             }
         }
       
