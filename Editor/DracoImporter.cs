@@ -30,6 +30,10 @@ namespace Draco.Editor {
             var dracoData = File.ReadAllBytes(ctx.assetPath);
             var draco = new DracoMeshLoader();
             var mesh = await draco.ConvertDracoMeshToUnity(dracoData, sync: true);
+            if (mesh == null) {
+                Debug.LogError("Import draco file failed");
+                return;
+            }
             ctx.AddObjectToAsset("mesh", mesh);
             ctx.SetMainObject(mesh);
         }
