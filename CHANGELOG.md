@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2021-05-18
+### Changed
+- `DracoMeshLoader`'s coordinate space conversion from right-hand (like in glTF) to left-hand (Unity) changed. Now this is performed by inverting the X-axis (before the Z-axis was inverted). Compared to the previous behaviour, meshes are rotated 180° along the up-axis (Y). This was done to better conform to the glTF specification.
+
 ## [2.0.0] - 2021-05-17
 ### Added
 - Experimental encoding support (ability to convert Unity Meshes into compressed Draco)
