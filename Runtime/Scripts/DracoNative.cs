@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using AOT;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -66,6 +67,7 @@ namespace Draco {
         GENERIC
     }
     
+    [BurstCompile]
     unsafe internal class DracoNative {
         
 #if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
@@ -86,6 +88,14 @@ namespace Draco {
         const int decoderPtrIndex = 1;
         const int bufferPtrIndex = 2;
 
+        // Cached function pointers
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueInt8Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueUInt8Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueInt16Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueUInt16Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueInt32Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueUInt32Method;
+        
         /// <summary>
         /// If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).
         /// </summary>
@@ -433,7 +443,8 @@ namespace Draco {
                     indicesAttribute = boneIndexMap.dracoAttribute,
                     weightsAttribute = boneWeightMap.dracoAttribute,
                     bonesPerVertex = bonesPerVertex,
-                    boneWeights = boneWeights
+                    boneWeights = boneWeights,
+                    indexValueConverter = GetIndexValueConverter(boneIndexMap.format)
                 };
                 jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
             }
@@ -565,6 +576,50 @@ namespace Draco {
 #endif
             boneIndexMap = null;
             boneWeightMap = null;
+        }
+
+        /// <summary>
+        /// Returns Burst compatible function that converts a (bone) index
+        /// of type `format` into an int
+        /// </summary>
+        /// <param name="format">Data type of bone index</param>
+        /// <returns>Burst Function Pointer to correct conversion function</returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueConverter(VertexAttributeFormat format) {
+            switch (format) {
+                case VertexAttributeFormat.UInt8:
+                    if (!GetIndexValueUInt8Method.IsCreated) {
+                        GetIndexValueUInt8Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt8);
+                    }
+                    return GetIndexValueUInt8Method;
+                case VertexAttributeFormat.SInt8:
+                    if (!GetIndexValueInt8Method.IsCreated) {
+                        GetIndexValueInt8Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt8);
+                    }
+                    return GetIndexValueInt8Method;
+                case VertexAttributeFormat.UInt16:
+                    if (!GetIndexValueUInt16Method.IsCreated) {
+                        GetIndexValueUInt16Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt16);
+                    }
+                    return GetIndexValueUInt16Method;
+                case VertexAttributeFormat.SInt16:
+                    if (!GetIndexValueInt16Method.IsCreated) {
+                        GetIndexValueInt16Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt16);
+                    }
+                    return GetIndexValueInt16Method;
+                case VertexAttributeFormat.UInt32:
+                    if (!GetIndexValueUInt32Method.IsCreated) {
+                        GetIndexValueUInt32Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt32);
+                    }
+                    return GetIndexValueUInt32Method;
+                case VertexAttributeFormat.SInt32:
+                    if (!GetIndexValueInt32Method.IsCreated) {
+                        GetIndexValueInt32Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt32);
+                    }
+                    return GetIndexValueInt32Method;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(format), format, null);
+            }
         }
 
         // The order must be consistent with C++ interface.
@@ -877,6 +932,10 @@ namespace Draco {
         [BurstCompile]
         struct GetDracoBonesJob : IJob {
             
+            public delegate int GetIndexValueDelegate(IntPtr baseAddress, int index);
+            
+            public FunctionPointer<GetIndexValueDelegate> indexValueConverter;
+            
             [ReadOnly]
             public NativeArray<int> result;
             [ReadOnly]
@@ -910,39 +969,14 @@ namespace Draco {
                 DracoData* weightsData = null;
                 GetAttributeData(dracoMesh, weightsAttribute, &weightsData, false);
                 var weightSize = DataTypeSize((DataType)weightsData->dataType) * weightsAttribute->numComponents;
-
-                Func<IntPtr, int, int> indexValueConverter = null;
-                switch (indicesDataType) {
-                    case DataType.DT_INT8:
-                        indexValueConverter = GetIndexValueInt8;
-                        break;
-                    case DataType.DT_UINT8:
-                        indexValueConverter = GetIndexValueUInt8;
-                        break;
-                    case DataType.DT_INT16:
-                        indexValueConverter = GetIndexValueInt16;
-                        break;
-                    case DataType.DT_UINT16:
-                        indexValueConverter = GetIndexValueUInt16;
-                        break;
-                    case DataType.DT_INT32:
-                        indexValueConverter = GetIndexValueInt32;
-                        break;
-                    case DataType.DT_UINT32:
-                        indexValueConverter = GetIndexValueUInt32;
-                        break;
-                    default:
-                        Debug.LogError($"Unsupported indicesDataType {indicesDataType}");
-                        return;
-                }
-
+                
                 for (var v = 0; v < dracoMesh->numVertices; v++) {
                     bonesPerVertex[v] = (byte) indicesAttribute->numComponents;
                     var indicesPtr = (IntPtr) (((byte*)indicesData->data) + (indexSize * v));
                     var weightsPtr = (float*) (((byte*)weightsData->data) + (weightSize * v));
                     for (var b = 0; b < indicesAttribute->numComponents; b++) {
                         boneWeights[v * indicesAttribute->numComponents + b] = new BoneWeight1 {
-                            boneIndex = indexValueConverter(indicesPtr,b),
+                            boneIndex = indexValueConverter.Invoke(indicesPtr,b),
                             weight = *(weightsPtr + b)
                         };
                     }
@@ -951,27 +985,39 @@ namespace Draco {
                 ReleaseDracoData(&weightsData);
             }
 
-            static int GetIndexValueUInt8(IntPtr baseAddress, int index) {
+            [BurstCompile]
+            [MonoPInvokeCallback(typeof(GetIndexValueDelegate))]
+            public static int GetIndexValueUInt8(IntPtr baseAddress, int index) {
                 return *((byte*)baseAddress+index);
             }
             
-            static int GetIndexValueInt8(IntPtr baseAddress, int index) {
+            [BurstCompile]
+            [MonoPInvokeCallback(typeof(GetIndexValueDelegate))]
+            public static int GetIndexValueInt8(IntPtr baseAddress, int index) {
                 return *(((sbyte*)baseAddress)+index);
             }
             
-            static int GetIndexValueUInt16(IntPtr baseAddress, int index) {
+            [BurstCompile]
+            [MonoPInvokeCallback(typeof(GetIndexValueDelegate))]
+            public static int GetIndexValueUInt16(IntPtr baseAddress, int index) {
                 return *(((ushort*)baseAddress)+index);
             }
             
-            static int GetIndexValueInt16(IntPtr baseAddress, int index) {
+            [BurstCompile]
+            [MonoPInvokeCallback(typeof(GetIndexValueDelegate))]
+            public static int GetIndexValueInt16(IntPtr baseAddress, int index) {
                 return *(((short*)baseAddress)+index);
             }
             
-            static int GetIndexValueUInt32(IntPtr baseAddress, int index) {
+            [BurstCompile]
+            [MonoPInvokeCallback(typeof(GetIndexValueDelegate))]
+            public static int GetIndexValueUInt32(IntPtr baseAddress, int index) {
                 return (int) *(((uint*)baseAddress)+index);
             }
             
-            static int GetIndexValueInt32(IntPtr baseAddress, int index) {
+            [BurstCompile]
+            [MonoPInvokeCallback(typeof(GetIndexValueDelegate))]
+            public static int GetIndexValueInt32(IntPtr baseAddress, int index) {
                 return *(((int*)baseAddress)+index);
             }
         }
