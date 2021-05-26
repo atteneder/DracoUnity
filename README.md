@@ -70,9 +70,36 @@ Next time you open your project in Unity, it will download the package automatic
 
 ## Using
 
-A usage example can be found in the [DracoUnityDemo](https://github.com/atteneder/DracoUnityDemo) project.
+Minimalistic way of loading a draco file:
 
-TODO: add usage example code
+```csharp
+public class DracoDemo : MonoBehaviour {
+    
+    public string filePath;
+
+    async void Start() {
+        
+        // Load file into memory
+        var fullPath = Path.Combine(Application.streamingAssetsPath, filePath);
+        var data = File.ReadAllBytes(fullPath);
+        
+        // Convert data to Unity mesh
+        var draco = new DracoMeshLoader();
+        // Async decoding has to start on the main thread and spawns multiple C# jobs.
+        var mesh = await draco.ConvertDracoMeshToUnity(data);
+        
+        if (mesh != null) {
+            // Use the resulting mesh
+            GetComponent<MeshFilter>().mesh= mesh;
+        }
+    }
+}
+```
+
+See the signature of [`DracoMeshLoader.ConvertDracoMeshToUnity`](https://github.com/atteneder/DracoUnity/blob/main/Runtime/Scripts/DracoMeshLoader.cs) to see all options available.
+
+This example and more can be found in the [DracoUnityDemo](https://github.com/atteneder/DracoUnityDemo) project.
+
 
 ## Origin
 

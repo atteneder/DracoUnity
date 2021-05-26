@@ -92,6 +92,10 @@ namespace Draco {
         /// Decodes a Draco mesh
         /// </summary>
         /// <param name="encodedData">Compressed Draco data</param>
+        /// /// <param name="requireNormals">If draco does not contain normals and this is set to true, normals are calculated.</param>
+        /// <param name="requireTangents">If draco does not contain tangents and this is set to true, tangents and normals are calculated.</param>
+        /// <param name="weightsAttributeId">Draco attribute ID that contains bone weights (for skinning)</param>
+        /// <param name="jointsAttributeId">Draco attribute ID that contains bone joint indices (for skinning)</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
         public async Task<Mesh> ConvertDracoMeshToUnity(
             NativeSlice<byte> encodedData,
@@ -132,6 +136,10 @@ namespace Draco {
         /// Decodes a Draco mesh
         /// </summary>
         /// <param name="encodedData">Compressed Draco data</param>
+        /// <param name="requireNormals">If draco does not contain normals and this is set to true, normals are calculated.</param>
+        /// <param name="requireTangents">If draco does not contain tangents and this is set to true, tangents and normals are calculated.</param>
+        /// <param name="weightsAttributeId">Draco attribute ID that contains bone weights (for skinning)</param>
+        /// <param name="jointsAttributeId">Draco attribute ID that contains bone joint indices (for skinning)</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
         public async Task<Mesh> ConvertDracoMeshToUnity(
             byte[] encodedData,
