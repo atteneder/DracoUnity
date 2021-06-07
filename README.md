@@ -17,6 +17,7 @@ Following build targets are supported
 - Universal Windows Platform (x64,x86,ARM,ARM64)
 - macOS (Apple Silicon an Intel)
 - Linux (64 and 32 bit)
+- Lumin / Magic Leap
 
 ## Installing
 

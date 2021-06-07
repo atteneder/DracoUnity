@@ -38,7 +38,7 @@ namespace Draco.Encoder {
         
 #if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
         const string DRACOENC_UNITY_LIB = "__Internal";
-#elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR
+#elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR || PLATFORM_LUMIN
         const string DRACOENC_UNITY_LIB = "dracoenc_unity";
 #endif
 
