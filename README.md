@@ -19,6 +19,8 @@ Following build targets are supported
 - Linux (64 and 32 bit)
 - Lumin / Magic Leap
 
+> Note: Burst support is broken on iOS builds at the moment. Please deactivate Burst AOT in the project settings until this is resolved.
+
 ## Installing
 
 The easiest way to install is to download and open the [Installer Package](https://package-installer.glitch.me/v1/installer/OpenUPM/com.atteneder.draco?registry=https%3A%2F%2Fpackage.openupm.com&scope=com.atteneder)
