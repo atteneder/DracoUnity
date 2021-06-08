@@ -70,7 +70,7 @@ namespace Draco {
     [BurstCompile]
     unsafe internal class DracoNative {
         
-#if UNITY_WEBGL || UNITY_IOS
+#if !UNITY_EDITOR && (UNITY_WEBGL || UNITY_IOS)
         const string DRACODEC_UNITY_LIB = "__Internal";
 #elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR || PLATFORM_LUMIN
         const string DRACODEC_UNITY_LIB = "dracodec_unity";
