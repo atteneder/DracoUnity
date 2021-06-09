@@ -86,7 +86,15 @@ public class DracoDemo : MonoBehaviour {
 
 ### Using MeshDataArray
 
-Starting with Unity 2020.2 you can create Meshes efficiently via [`MeshDataArray`][MeshDataArray]. Here's an examply slightly more sophisticated ([source][DracoDemoMeshData]):
+Starting with Unity 2020.2 you can create Meshes efficiently via [`MeshDataArray`][MeshDataArray].
+
+The important difference is that instead of returning a `Mesh` directly, it just configures the `MeshData` properly and fills its buffers. It's up to the user to:
+
+- Create the `Mesh` instance(s)
+- Apply the data via `Mesh.ApplyAndDisposeWritableMeshData`
+- In case the mesh had bone weight data, apply and dispose those as well (optional extra step)
+
+Here's an examply how to do this ([source][DracoDemoMeshData]):
 
 ```csharp
 public class DracoDemoMeshData : MonoBehaviour {
