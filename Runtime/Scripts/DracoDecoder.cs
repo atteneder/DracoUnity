@@ -18,9 +18,10 @@ using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Draco {
-
+    [ExecuteInEditMode]
     public class DracoDecoder : MonoBehaviour {
 
+        [SerializeField]
         public DracoDecodeInstance[] instances;
 
         async void Start() {

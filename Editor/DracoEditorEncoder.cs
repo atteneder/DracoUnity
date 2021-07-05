@@ -118,7 +118,7 @@ namespace Draco.Editor {
             CompressMeshFilters(meshFilters.ToArray(), sceneDir);
         }
 
-        static void CompressMeshFilters(MeshFilter[] meshFilters, string directory = null) {
+        public static void CompressMeshFilters(MeshFilter[] meshFilters, string directory = null) {
 
             var instances = new Dictionary<TextAsset, DracoDecodeInstance>();
             
@@ -139,38 +139,38 @@ namespace Draco.Editor {
                 var mesh = meshFilter.sharedMesh;
                 if(mesh==null) continue;
                 if (!mesh.isReadable) {
-                    Debug.LogError("Mesh is not readable!");
-                    return;
+                    Debug.LogWarning($"{mesh.name} is not readable!");
+                    continue;
                 }
                 
                 var dracoMesh = new DracoMesh(meshFilter, directory);
-                var dracoFilesMissing = !dracoMesh.TryLoadDracoAssets();
 
-                if (dracoFilesMissing) {
+                if (!dracoMesh.TryLoadDracoAssets()) {
                     var scale = meshFilter.transform.localToWorldMatrix.lossyScale;
                     var dracoData = DracoEncoder.EncodeMesh(mesh,scale,.0001f);
                     if (dracoData!=null && dracoData.Length > 0) {
                         for (var submesh = 0; submesh < dracoData.Length; submesh++) {
-                            if(submesh>0) Debug.LogWarning("more than one submesh. not supported yet.");
+                            if(submesh>0) Debug.LogWarning($"{mesh.name} has more than one submesh. Draco compression of submeshes is not supported yet.");
                             File.WriteAllBytes(dracoMesh.GetSubmeshAssetPath(submesh),dracoData[submesh].data.ToArray());
                             dracoData[submesh].Dispose();
                             dracoFilesUpdated = true;
                             AssetDatabase.SaveAssets();
                             AssetDatabase.Refresh();
+                            dracoMeshes.Add(dracoMesh);
                         }
                     } else {
-                        Debug.LogError("Draco encoding failed");
-                        return;
+                        Debug.LogWarning($"{mesh.name} could not be encoded.");
                     }
                 }
-                
-                dracoMeshes.Add(dracoMesh);
+                else
+                {
+                    dracoMeshes.Add(dracoMesh);
+                }
             }
 
             if (dracoFilesUpdated) {
-
                 foreach (var dracoMesh in dracoMeshes) {
-                    if (!dracoMesh.TryLoadDracoAssets()) {
+                    if (!dracoMesh.TryLoadDracoAssets()) { // This shouldn't ever trigger
                         Debug.LogError("Loading draco assets failed");
                         return;
                     }
@@ -185,7 +185,7 @@ namespace Draco.Editor {
                         instance.AddTarget(dracoMesh.target);
                     }
                     else {
-                        var newInstance = ScriptableObject.CreateInstance<DracoDecodeInstance>();
+                        var newInstance = new DracoDecodeInstance();
                         var bounds = dracoMesh.target.sharedMesh.bounds;
                         newInstance.SetAsset(dracoAsset,bounds);
                         newInstance.AddTarget(dracoMesh.target);
