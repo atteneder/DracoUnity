@@ -179,7 +179,8 @@ namespace Draco {
             bool requireTangents,
             int weightsAttributeId,
             int jointsAttributeId,
-            out bool calculateNormals
+            out bool calculateNormals,
+            bool forceUnityLayout = false
             )
         {
             Profiler.BeginSample("CalculateVertexParams");
@@ -258,29 +259,33 @@ namespace Draco {
             if (requireTangents) {
                 attributes.Add(new CalculatedAttributeMap(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 4 ));
             }
-            CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
-            var hasTexCoords = CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
+            var hasTexCoordOrColor = CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
+            hasTexCoordOrColor |= CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
 
-            var hasBlend = false;
+            var hasSkinning = false;
             if (weightsAttributeId >= 0) {
                 if (CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh, out var map)) {
                     // BLENDHACK: Don't add bone weights, as they won't exist after Mesh.SetBoneWeights
                     // attributes.Add(map);
                     boneWeightMap = map;
-                    hasBlend = true;
+                    hasSkinning = true;
                 }
             }
             if (jointsAttributeId >= 0) {
                 if (CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh, out var map)) {
                     attributes.Add(map);
                     boneIndexMap = map;
-                    hasBlend = true;
+                    hasSkinning = true;
                 }
             }
             
             streamStrides = new int[maxStreamCount];
             streamMemberCount = new int[maxStreamCount];
             var streamIndex = 0;
+            
+            // skinning requires SkinnedMeshRenderer layout
+            forceUnityLayout |= hasSkinning;
+            
             foreach (var attributeMap in attributes) {
                 // Stream assignment:
                 // Positions get a dedicated stream (0)
@@ -288,24 +293,37 @@ namespace Draco {
                 
                 // If blend weights or blend indices are present, they land on stream 1
                 // while the rest is combined in stream 0
-                // TODO: BLENDHACK;  
-                // A potentially following Mesh.SetBoneWeights changes stream assignment again!
-                // Maybe it would be better to rebuild Unity's logic?
+
+                // Mesh layout SkinnedMeshRenderer (used for skinning and blend shapes)
+                // requires:
+                // stream 0: position,normal,tangent
+                // stream 1: UVs,colors
+                // stream 2: blend weights/indices
 
                 switch (attributeMap.attribute) {
                     case VertexAttribute.Position:
                         // Attributes that define/change the position go to stream 0
                         streamIndex = 0;
                         break;
-                    default:
-                        // The rest to stream 1, but not if blend weights/joints are present
-                        // In this case putting everything in stream 0 (except blend weights/joints) proved to work 
-                        streamIndex = hasBlend ? 0 : 1;
+                    case VertexAttribute.Normal:
+                    case VertexAttribute.Tangent:
+                        streamIndex = forceUnityLayout ? 0 : 1;
+                        break;
+                    case VertexAttribute.TexCoord0:
+                    case VertexAttribute.TexCoord1:
+                    case VertexAttribute.TexCoord2:
+                    case VertexAttribute.TexCoord3:
+                    case VertexAttribute.TexCoord4:
+                    case VertexAttribute.TexCoord5:
+                    case VertexAttribute.TexCoord6:
+                    case VertexAttribute.TexCoord7:
+                    case VertexAttribute.Color:
+                        streamIndex = 1;
                         break;
                     case VertexAttribute.BlendWeight:
                     case VertexAttribute.BlendIndices:
                         // Special case: blend weights/joints always have a special stream
-                        streamIndex = 1;
+                        streamIndex = hasTexCoordOrColor ? 2 : 1;
                         break;
                 }
 #if !DRACO_MESH_DATA
@@ -465,12 +483,13 @@ namespace Draco {
             return releaseDreacoMeshJobHandle;
         }
 
-        public void CreateMesh(
+        internal void CreateMesh(
             out bool calculateNormals,
             bool requireNormals = false,
             bool requireTangents = false,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
         )
         {
             Profiler.BeginSample("CreateMesh");
@@ -478,7 +497,15 @@ namespace Draco {
             var dracoMesh = (DracoMesh*)dracoTempResources[meshPtrIndex];
             allocator = dracoMesh->numVertices > persistentDataThreshold ? Allocator.Persistent : Allocator.TempJob;
             
-            CalculateVertexParams(dracoMesh, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId, out calculateNormals);
+            CalculateVertexParams(
+                dracoMesh,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                out calculateNormals,
+                forceUnityLayout
+                );
             
             Profiler.BeginSample("SetParameters");
 #if DRACO_MESH_DATA

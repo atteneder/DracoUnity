@@ -96,20 +96,31 @@ namespace Draco {
         /// <param name="requireTangents">If draco does not contain tangents and this is set to true, tangents and normals are calculated.</param>
         /// <param name="weightsAttributeId">Draco attribute ID that contains bone weights (for skinning)</param>
         /// <param name="jointsAttributeId">Draco attribute ID that contains bone joint indices (for skinning)</param>
+        /// <param name="forceUnityLayout">Enforces vertex buffer layout with highest compatibility. Enable this if you want to use blend shapes on the resulting mesh</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
         public async Task<Mesh> ConvertDracoMeshToUnity(
             NativeSlice<byte> encodedData,
             bool requireNormals = false,
             bool requireTangents = false,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
             )
         {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
 #if DRACO_MESH_DATA
             var meshDataArray = Mesh.AllocateWritableMeshData(1); 
             var mesh = meshDataArray[0];
-            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            var result = await ConvertDracoMeshToUnity(
+                mesh,
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
+                );
             if (!result.success) {
                 meshDataArray.Dispose();
                 return null;
@@ -128,7 +139,15 @@ namespace Draco {
             }
             return unityMesh;
 #else
-            return await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            return await ConvertDracoMeshToUnity(
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
+                );
 #endif
         }
 
@@ -140,13 +159,15 @@ namespace Draco {
         /// <param name="requireTangents">If draco does not contain tangents and this is set to true, tangents and normals are calculated.</param>
         /// <param name="weightsAttributeId">Draco attribute ID that contains bone weights (for skinning)</param>
         /// <param name="jointsAttributeId">Draco attribute ID that contains bone joint indices (for skinning)</param>
+        /// <param name="forceUnityLayout">Enforces vertex buffer layout with highest compatibility. Enable this if you want to use blend shapes on the resulting mesh</param>
         /// <returns>Unity Mesh or null in case of errors</returns>
         public async Task<Mesh> ConvertDracoMeshToUnity(
             byte[] encodedData,
             bool requireNormals = false,
             bool requireTangents = false,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
 #if UNITY_EDITOR
             ,bool sync = false
 #endif
@@ -156,7 +177,15 @@ namespace Draco {
 #if DRACO_MESH_DATA
             var meshDataArray = Mesh.AllocateWritableMeshData(1);
             var mesh = meshDataArray[0];
-            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId
+            var result = await ConvertDracoMeshToUnity(
+                mesh,
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
 #if UNITY_EDITOR
                 ,sync
 #endif
@@ -176,7 +205,14 @@ namespace Draco {
             }
             return unityMesh;
 #else
-            var result = await ConvertDracoMeshToUnity(encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId
+            var result = await ConvertDracoMeshToUnity(
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
 #if UNITY_EDITOR
                 ,sync
 #endif
@@ -187,34 +223,78 @@ namespace Draco {
         }
 
 #if DRACO_MESH_DATA
+        /// <summary>
+        /// Decodes a Draco mesh
+        /// </summary>
+        /// <param name="mesh">MeshData used to create the mesh</param>
+        /// <param name="encodedData">Compressed Draco data</param>
+        /// <param name="requireNormals">If draco does not contain normals and this is set to true, normals are calculated.</param>
+        /// <param name="requireTangents">If draco does not contain tangents and this is set to true, tangents and normals are calculated.</param>
+        /// <param name="weightsAttributeId">Draco attribute ID that contains bone weights (for skinning)</param>
+        /// <param name="jointsAttributeId">Draco attribute ID that contains bone joint indices (for skinning)</param>
+        /// <param name="forceUnityLayout">Enforces vertex buffer layout with highest compatibility. Enable this if you want to use blend shapes on the resulting mesh</param>
+        /// <returns>A DecodeResult</returns>
         public async Task<DecodeResult> ConvertDracoMeshToUnity(
             Mesh.MeshData mesh,
             byte[] encodedData,
             bool requireNormals = false,
             bool requireTangents = false,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
             )
         {
             var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
-            var result = await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            var result = await ConvertDracoMeshToUnity(
+                mesh,
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
+                );
             UnsafeUtility.ReleaseGCObject(gcHandle);
             return result;
         }
         
-        public async Task<DecodeResult> ConvertDracoMeshToUnity(Mesh.MeshData mesh, NativeArray<byte> encodedData, bool requireNormals = false,
+        /// <summary>
+        /// Decodes a Draco mesh
+        /// </summary>
+        /// <param name="mesh">MeshData used to create the mesh</param>
+        /// <param name="encodedData">Compressed Draco data</param>
+        /// <param name="requireNormals">If draco does not contain normals and this is set to true, normals are calculated.</param>
+        /// <param name="requireTangents">If draco does not contain tangents and this is set to true, tangents and normals are calculated.</param>
+        /// <param name="weightsAttributeId">Draco attribute ID that contains bone weights (for skinning)</param>
+        /// <param name="jointsAttributeId">Draco attribute ID that contains bone joint indices (for skinning)</param>
+        /// <param name="forceUnityLayout">Enforces vertex buffer layout with highest compatibility. Enable this if you want to use blend shapes on the resulting mesh</param>
+        /// <returns>A DecodeResult</returns>
+        public async Task<DecodeResult> ConvertDracoMeshToUnity(
+            Mesh.MeshData mesh,
+            NativeArray<byte> encodedData,
+            bool requireNormals = false,
             bool requireTangents = false,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
 #if UNITY_EDITOR
             ,bool sync = false
 #endif
             )
         {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
-            return await ConvertDracoMeshToUnity(mesh, encodedDataPtr, encodedData.Length, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId
+            return await ConvertDracoMeshToUnity(
+                mesh,
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
 #if UNITY_EDITOR
-            ,sync
+                ,sync
 #endif
             );
         }
@@ -228,7 +308,8 @@ namespace Draco {
             bool requireNormals,
             bool requireTangents,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
 #if UNITY_EDITOR
             ,bool sync = false
 #endif
@@ -240,7 +321,8 @@ namespace Draco {
             bool requireNormals,
             bool requireTangents,
             int weightsAttributeId = -1,
-            int jointsAttributeId = -1
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
 #if UNITY_EDITOR
             ,bool sync = false
 #endif
@@ -275,9 +357,23 @@ namespace Draco {
                 requireNormals = true;
             }
 #if DRACO_MESH_DATA
-            dracoNative.CreateMesh(out result.calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            dracoNative.CreateMesh(
+                out result.calculateNormals,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
+                );
 #else
-            dracoNative.CreateMesh(out var calculateNormals, requireNormals, requireTangents, weightsAttributeId, jointsAttributeId);
+            dracoNative.CreateMesh(
+                out var calculateNormals,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
+                );
 #endif
             
 #if UNITY_EDITOR
