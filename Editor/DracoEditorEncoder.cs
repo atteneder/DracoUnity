@@ -139,7 +139,11 @@ namespace Draco.Editor {
                 var mesh = meshFilter.sharedMesh;
                 if(mesh==null) continue;
                 if (!mesh.isReadable) {
-                    Debug.LogWarning($"{mesh.name} is not readable!");
+                    Debug.LogWarning($"{mesh.name} is not readable.");
+                    continue;
+                }
+                if (mesh.subMeshCount > 1) {
+                    Debug.LogWarning($"{mesh.name} has more than one submesh. Draco compression of submeshes is not supported yet.");
                     continue;
                 }
                 
