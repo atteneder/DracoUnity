@@ -41,7 +41,10 @@ namespace Draco.Editor {
                 submeshAssetPaths = new string[mesh.subMeshCount];
                 
                 // Get unique ids used to reference mesh and create file names out of them
-                Debug.Assert(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID));
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
+                {
+                    Debug.Log("Error retrieving ID for mesh {mesh.name}.");
+                }
                 var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++) {
                     submeshFilenames[submesh] = string.Format(filename, submesh);
@@ -230,7 +233,10 @@ namespace Draco.Editor {
             }
             var dracoData = DracoEncoder.EncodeMesh(mesh);
             if (dracoData.Length > 1) {
-                Debug.Assert(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID));
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
+                {
+                    Debug.Log("Error retrieving ID for mesh {mesh.name}.");
+                }
                 var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (var submesh = 0; submesh < dracoData.Length; submesh++) {
                     File.WriteAllBytes(Path.Combine(directory,string.Format(filename,submesh)),dracoData[submesh].data.ToArray());
@@ -238,7 +244,10 @@ namespace Draco.Editor {
                 }
             }
             else {
-                Debug.Assert(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID));
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
+                {
+                    Debug.Log("Error retrieving ID for mesh {mesh.name}.");
+                }
                 var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 File.WriteAllBytes(Path.Combine(directory, filename), dracoData[0].data.ToArray());
                 dracoData[0].Dispose();

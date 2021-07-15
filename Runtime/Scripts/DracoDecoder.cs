@@ -21,10 +21,14 @@ namespace Draco {
     [ExecuteInEditMode]
     public class DracoDecoder : MonoBehaviour {
 
-        [SerializeField]
         public DracoDecodeInstance[] instances;
 
-        async void Start() {
+        async void Start()
+        {
+            await Decompress();
+        }
+
+        public async Task Decompress() {
             var startTime = Time.realtimeSinceStartup;
             var tasks = new Task[instances.Length];
             for (var i = 0; i < instances.Length; i++) {
