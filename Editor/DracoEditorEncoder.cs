@@ -40,7 +40,9 @@ namespace Draco.Editor {
                 submeshFilenames = new string[mesh.subMeshCount];
                 submeshAssetPaths = new string[mesh.subMeshCount];
                 
-                var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-0.drc" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
+                // Get unique ids used to reference mesh and create file names out of them
+                Debug.Assert(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID));
+                var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++) {
                     submeshFilenames[submesh] = string.Format(filename, submesh);
                     submeshAssetPaths[submesh] = Path.Combine(directory, submeshFilenames[submesh]);
@@ -228,14 +230,16 @@ namespace Draco.Editor {
             }
             var dracoData = DracoEncoder.EncodeMesh(mesh);
             if (dracoData.Length > 1) {
-                var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-{0}.drc.bytes" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
+                Debug.Assert(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID));
+                var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (var submesh = 0; submesh < dracoData.Length; submesh++) {
                     File.WriteAllBytes(Path.Combine(directory,string.Format(filename,submesh)),dracoData[submesh].data.ToArray());
                     dracoData[submesh].Dispose();
                 }
             }
             else {
-                var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh.drc.bytes" : $"{mesh.name}.drc.bytes";
+                Debug.Assert(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID));
+                var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 File.WriteAllBytes(Path.Combine(directory, filename), dracoData[0].data.ToArray());
                 dracoData[0].Dispose();
             }
