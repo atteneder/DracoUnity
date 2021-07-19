@@ -123,11 +123,18 @@ namespace Draco.Editor {
             CompressMeshFilters(meshFilters.ToArray(), sceneDir);
         }
 
-        public static void CompressMeshFilters(MeshFilter[] meshFilters, string directory = null) {
+        public static void CompressMeshFilters(MeshFilter[] meshFilters, string directory = null)
+        {
+            CompressMeshFilters(meshFilters, null, directory);
+        }
+
+        public static void CompressMeshFilters(MeshFilter[] meshFilters, MeshDecoder meshDecoder, string directory = null) {
 
             var instances = new Dictionary<TextAsset, DracoDecodeInstance>();
             
-            var meshDecoder = Object.FindObjectOfType<DracoDecoder>();
+            if (meshDecoder == null) {
+                meshDecoder = Object.FindObjectOfType<DracoDecoder>();
+            }
             if (meshDecoder == null) {
                 meshDecoder = new GameObject("MeshDecoder").AddComponent<DracoDecoder>();
             }
