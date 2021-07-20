@@ -43,7 +43,7 @@ namespace Draco.Editor {
                 // Get unique ids used to reference mesh and create file names out of them
                 if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
                 {
-                    Debug.Log("Error retrieving ID for mesh {mesh.name}.");
+                    Debug.LogWarning("Error retrieving ID for mesh {mesh.name}.");
                 }
                 var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++) {
@@ -128,7 +128,7 @@ namespace Draco.Editor {
             CompressMeshFilters(meshFilters, null, directory);
         }
 
-        public static void CompressMeshFilters(MeshFilter[] meshFilters, MeshDecoder meshDecoder, string directory = null) {
+        public static void CompressMeshFilters(MeshFilter[] meshFilters, DracoDecoder meshDecoder, string directory = null) {
 
             var instances = new Dictionary<TextAsset, DracoDecodeInstance>();
             
@@ -178,8 +178,7 @@ namespace Draco.Editor {
                         Debug.LogWarning($"{mesh.name} could not be encoded.");
                     }
                 }
-                else
-                {
+                else {
                     dracoMeshes.Add(dracoMesh);
                 }
             }
@@ -242,7 +241,7 @@ namespace Draco.Editor {
             if (dracoData.Length > 1) {
                 if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
                 {
-                    Debug.Log("Error retrieving ID for mesh {mesh.name}.");
+                    Debug.LogWarning("Error retrieving ID for mesh {mesh.name}.");
                 }
                 var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (var submesh = 0; submesh < dracoData.Length; submesh++) {
@@ -253,7 +252,7 @@ namespace Draco.Editor {
             else {
                 if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
                 {
-                    Debug.Log("Error retrieving ID for mesh {mesh.name}.");
+                    Debug.LogWarning("Error retrieving ID for mesh {mesh.name}.");
                 }
                 var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 File.WriteAllBytes(Path.Combine(directory, filename), dracoData[0].data.ToArray());
