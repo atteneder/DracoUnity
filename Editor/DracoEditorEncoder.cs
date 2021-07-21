@@ -40,7 +40,12 @@ namespace Draco.Editor {
                 submeshFilenames = new string[mesh.subMeshCount];
                 submeshAssetPaths = new string[mesh.subMeshCount];
                 
-                var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-0.drc" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
+                // Get unique ids used to reference mesh and create file names out of them
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
+                {
+                    Debug.LogWarning("Error retrieving ID for mesh {mesh.name}.");
+                }
+                var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++) {
                     submeshFilenames[submesh] = string.Format(filename, submesh);
                     submeshAssetPaths[submesh] = Path.Combine(directory, submeshFilenames[submesh]);
@@ -118,11 +123,18 @@ namespace Draco.Editor {
             CompressMeshFilters(meshFilters.ToArray(), sceneDir);
         }
 
-        static void CompressMeshFilters(MeshFilter[] meshFilters, string directory = null) {
+        public static void CompressMeshFilters(MeshFilter[] meshFilters, string directory = null)
+        {
+            CompressMeshFilters(meshFilters, null, directory);
+        }
+
+        public static void CompressMeshFilters(MeshFilter[] meshFilters, DracoDecoder meshDecoder, string directory = null) {
 
             var instances = new Dictionary<TextAsset, DracoDecodeInstance>();
             
-            var meshDecoder = Object.FindObjectOfType<DracoDecoder>();
+            if (meshDecoder == null) {
+                meshDecoder = Object.FindObjectOfType<DracoDecoder>();
+            }
             if (meshDecoder == null) {
                 meshDecoder = new GameObject("MeshDecoder").AddComponent<DracoDecoder>();
             }
@@ -139,38 +151,41 @@ namespace Draco.Editor {
                 var mesh = meshFilter.sharedMesh;
                 if(mesh==null) continue;
                 if (!mesh.isReadable) {
-                    Debug.LogError("Mesh is not readable!");
-                    return;
+                    Debug.LogWarning($"{mesh.name} is not readable.");
+                    continue;
+                }
+                if (mesh.subMeshCount > 1) {
+                    Debug.LogWarning($"{mesh.name} has more than one submesh. Draco compression of submeshes is not supported yet.");
+                    continue;
                 }
                 
                 var dracoMesh = new DracoMesh(meshFilter, directory);
-                var dracoFilesMissing = !dracoMesh.TryLoadDracoAssets();
 
-                if (dracoFilesMissing) {
+                if (!dracoMesh.TryLoadDracoAssets()) {
                     var scale = meshFilter.transform.localToWorldMatrix.lossyScale;
                     var dracoData = DracoEncoder.EncodeMesh(mesh,scale,.0001f);
                     if (dracoData!=null && dracoData.Length > 0) {
                         for (var submesh = 0; submesh < dracoData.Length; submesh++) {
-                            if(submesh>0) Debug.LogWarning("more than one submesh. not supported yet.");
+                            if(submesh>0) Debug.LogWarning($"{mesh.name} has more than one submesh. Draco compression of submeshes is not supported yet.");
                             File.WriteAllBytes(dracoMesh.GetSubmeshAssetPath(submesh),dracoData[submesh].data.ToArray());
                             dracoData[submesh].Dispose();
                             dracoFilesUpdated = true;
                             AssetDatabase.SaveAssets();
                             AssetDatabase.Refresh();
+                            dracoMeshes.Add(dracoMesh);
                         }
                     } else {
-                        Debug.LogError("Draco encoding failed");
-                        return;
+                        Debug.LogWarning($"{mesh.name} could not be encoded.");
                     }
                 }
-                
-                dracoMeshes.Add(dracoMesh);
+                else {
+                    dracoMeshes.Add(dracoMesh);
+                }
             }
 
             if (dracoFilesUpdated) {
-
                 foreach (var dracoMesh in dracoMeshes) {
-                    if (!dracoMesh.TryLoadDracoAssets()) {
+                    if (!dracoMesh.TryLoadDracoAssets()) { // This shouldn't ever trigger
                         Debug.LogError("Loading draco assets failed");
                         return;
                     }
@@ -185,7 +200,7 @@ namespace Draco.Editor {
                         instance.AddTarget(dracoMesh.target);
                     }
                     else {
-                        var newInstance = ScriptableObject.CreateInstance<DracoDecodeInstance>();
+                        var newInstance = new DracoDecodeInstance();
                         var bounds = dracoMesh.target.sharedMesh.bounds;
                         newInstance.SetAsset(dracoAsset,bounds);
                         newInstance.AddTarget(dracoMesh.target);
@@ -224,14 +239,22 @@ namespace Draco.Editor {
             }
             var dracoData = DracoEncoder.EncodeMesh(mesh);
             if (dracoData.Length > 1) {
-                var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-{0}.drc.bytes" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
+                {
+                    Debug.LogWarning("Error retrieving ID for mesh {mesh.name}.");
+                }
+                var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 for (var submesh = 0; submesh < dracoData.Length; submesh++) {
                     File.WriteAllBytes(Path.Combine(directory,string.Format(filename,submesh)),dracoData[submesh].data.ToArray());
                     dracoData[submesh].Dispose();
                 }
             }
             else {
-                var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh.drc.bytes" : $"{mesh.name}.drc.bytes";
+                if (!AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mesh, out string guid, out long localID))
+                {
+                    Debug.LogWarning("Error retrieving ID for mesh {mesh.name}.");
+                }
+                var filename = $"{guid}-{localID}-{{0}}.drc.bytes";
                 File.WriteAllBytes(Path.Combine(directory, filename), dracoData[0].data.ToArray());
                 dracoData[0].Dispose();
             }
