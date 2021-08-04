@@ -112,6 +112,7 @@ namespace Draco {
 #if DRACO_MESH_DATA
         Mesh.MeshData mesh;
         int indicesCount;
+        bool isPointCloud;
 #else
         Mesh mesh;
         int streamCount;
@@ -510,10 +511,14 @@ namespace Draco {
             Profiler.BeginSample("SetParameters");
 #if DRACO_MESH_DATA
             indicesCount = dracoMesh->numFaces * 3;
+            isPointCloud = dracoMesh->isPointCloud;
 #else
             mesh = new Mesh();
 #endif
-            mesh.SetIndexBufferParams(dracoMesh->numFaces*3, IndexFormat.UInt32);
+            if (!isPointCloud)
+            {
+                mesh.SetIndexBufferParams(dracoMesh->numFaces * 3, IndexFormat.UInt32);
+            }
             var vertexParams = new List<VertexAttributeDescriptor>(attributes.Count);
             foreach (var map in attributes) {
                 vertexParams.Add(map.GetVertexAttributeDescriptor());
@@ -569,7 +574,7 @@ namespace Draco {
 #endif
 
             mesh.subMeshCount = 1;
-            var submeshDescriptor = new SubMeshDescriptor(0, indicesCount) { firstVertex = 0, baseVertex = 0, vertexCount = mesh.vertexCount };
+            var submeshDescriptor = new SubMeshDescriptor(0, indicesCount, isPointCloud ? MeshTopology.Points : MeshTopology.Triangles) { firstVertex = 0, baseVertex = 0, vertexCount = mesh.vertexCount };
             mesh.SetSubMesh(0, submeshDescriptor, flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
 
@@ -669,6 +674,7 @@ namespace Draco {
             public int numFaces;
             public int numVertices;
             public int numAttributes;
+            public bool isPointCloud;
         }
 
         // Release data associated with DracoMesh.
@@ -854,6 +860,10 @@ namespace Draco {
                     return;
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                if (dracoMesh->isPointCloud)
+                {
+                    return;
+                }
                 DracoData* dracoIndices;
                 GetMeshIndices(dracoMesh, &dracoIndices, flip);
                 int indexSize = DataTypeSize((DataType)dracoIndices->dataType);

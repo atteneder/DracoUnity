@@ -131,11 +131,17 @@ namespace Draco {
                 result.boneWeightData.ApplyOnMesh(unityMesh);
                 result.boneWeightData.Dispose();
             }
-            if (result.calculateNormals) {
-                unityMesh.RecalculateNormals();
-            }
-            if (requireTangents) {
-                unityMesh.RecalculateTangents();
+
+            if (unityMesh.GetTopology(0) == MeshTopology.Triangles)
+            {
+                if (result.calculateNormals)
+                {
+                    unityMesh.RecalculateNormals();
+                }
+                if (requireTangents)
+                {
+                    unityMesh.RecalculateTangents();
+                }
             }
             return unityMesh;
 #else
