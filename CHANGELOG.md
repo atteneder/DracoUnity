@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebGL library is built with Emscripten 2.0.19 now
 - Minimum required version is Unity 2021.2
 
+## [3.1.0] - 2020-07-12
+### Added
+- `forceUnityLayout` parameter, to enforce a blend-shape and skinning compatible vertex buffer layout
+
 ## [3.0.3] - 2020-06-09
 ### Added
 - Support for Lumin / Magic Leap
