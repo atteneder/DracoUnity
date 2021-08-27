@@ -722,12 +722,26 @@ namespace Draco {
         [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool
             GetAttributeByUniqueId(DracoMesh* mesh, int unique_id,
                 DracoAttribute**attr);
+        
+        /// <summary>
+        /// Returns an array of indices as well as the type of data in data_type. On
+        /// input, indices must be null. The returned indices must be released with
+        /// ReleaseDracoData. 
+        /// </summary>
+        /// <param name="mesh">DracoMesh to extract indices from</param>
+        /// <param name="dataType">Index data type (int or short) </param>
+        /// <param name="indices">Destination index buffer</param>
+        /// <param name="indicesCount">Number of indices (equals triangle count * 3)</param>
+        /// <param name="flip">If true, triangle vertex order is reverted</param>
+        /// <returns>True if extraction succeeded, false otherwise</returns>
+        [DllImport (DRACODEC_UNITY_LIB)] static extern bool GetMeshIndices(
+            DracoMesh* mesh,
+            DataType dataType,
+            void* indices,
+            int indicesCount,
+            bool flip
+            );
 
-        // Returns an array of indices as well as the type of data in data_type. On
-        // input, indices must be null. The returned indices must be released with
-        // ReleaseDracoData.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetMeshIndices(
-            DracoMesh* mesh, DracoData**indices, DataType dataType, bool flip);
         // Returns an array of attribute data as well as the type of data in
         // data_type. On input, data must be null. The returned data must be
         // released with ReleaseDracoData.
@@ -898,10 +912,6 @@ namespace Draco {
                     return;
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
-                DracoData* dracoIndices;
-                GetMeshIndices(dracoMesh, &dracoIndices, dataType, flip);
-                int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
-                int* indicesData = (int*)dracoIndices->data;
 #if DRACO_MESH_DATA
                 void* indicesPtr;
                 int indicesLength;
@@ -923,8 +933,7 @@ namespace Draco {
                         throw new ArgumentOutOfRangeException();
                 }
 #endif
-                UnsafeUtility.MemCpy(indicesPtr, indicesData, indicesLength * indexSize);
-                ReleaseDracoData(&dracoIndices);
+                GetMeshIndices(dracoMesh, dataType, indicesPtr, indicesLength, flip);
             }
         }
 

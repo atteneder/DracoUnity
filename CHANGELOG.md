@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 
 ### Changed
 - Less memory usage and better performance by creating 16-bit unsigned integer indices for small meshes
+- Less memory usage by avoiding a temporary index buffer in native plug-in
 
 ## [3.1.0] - 2020-07-12
 ### Added
