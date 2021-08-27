@@ -286,6 +286,13 @@ namespace Draco {
             // skinning requires SkinnedMeshRenderer layout
             forceUnityLayout |= hasSkinning;
             
+            // On scenes with lots of small meshes the overhead of lots
+            // of dedicated vertex buffers can have severe negative impact
+            // on performance. Therefore we stick to Unity's layout (which
+            // combines pos+normal+tangent in one stream) for smaller meshes.
+            // See: https://github.com/atteneder/glTFast/issues/197
+            forceUnityLayout |= dracoMesh->numVertices <= ushort.MaxValue;
+
             foreach (var attributeMap in attributes) {
                 // Stream assignment:
                 // Positions get a dedicated stream (0)
