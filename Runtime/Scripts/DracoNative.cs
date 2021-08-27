@@ -115,7 +115,7 @@ namespace Draco {
 #else
         Mesh mesh;
         int streamCount;
-        NativeArray<uint> indices;
+        NativeIndexBufferBase indices;
         NativeArray<byte>[] vData;
         byte*[] vDataPtr;
 #endif
@@ -349,7 +349,11 @@ namespace Draco {
 #if !DRACO_MESH_DATA
         void AllocateIndices(DracoMesh* dracoMesh) {
             Profiler.BeginSample("AllocateIndices");
-            indices = new NativeArray<uint>(dracoMesh->numFaces * 3, allocator, NativeArrayOptions.UninitializedMemory);
+            if (dracoMesh->indexFormat == IndexFormat.UInt16) {
+                indices = new NativeIndexBuffer<ushort>(dracoMesh->numFaces * 3, allocator);
+            } else {
+                indices = new NativeIndexBuffer<uint>(dracoMesh->numFaces * 3, allocator);
+            }
             Profiler.EndSample(); // AllocateIndices
         }
         
@@ -391,10 +395,12 @@ namespace Draco {
                 result = dracoDecodeResult,
                 dracoTempResources = dracoTempResources,
                 flip = convertSpace,
+                dataType = mesh.indexFormat == IndexFormat.UInt16 ? DataType.DT_UINT16 : DataType.DT_UINT32, 
 #if DRACO_MESH_DATA
                 mesh = mesh
 #else
-                indices = indices
+                indicesPtr = indices.unsafePtr,
+                indicesLength =  indices.Length
 #endif
             };
             var jobCount = attributes.Count + 1;
@@ -520,7 +526,7 @@ namespace Draco {
 #else
             mesh = new Mesh();
 #endif
-            mesh.SetIndexBufferParams(dracoMesh->numFaces*3, IndexFormat.UInt32);
+            mesh.SetIndexBufferParams(dracoMesh->numFaces*3, dracoMesh->indexFormat);
             var vertexParams = new List<VertexAttributeDescriptor>(attributes.Count);
             foreach (var map in attributes) {
                 vertexParams.Add(map.GetVertexAttributeDescriptor());
@@ -567,7 +573,7 @@ namespace Draco {
                 mesh.SetVertexBufferData(vData[streamIndex], 0, 0, vData[streamIndex].Length, streamIndex, flags);
             }
 
-            mesh.SetIndexBufferData(indices, 0, 0, indices.Length);
+            indices.SetMeshIndexBufferData(mesh);
             var indicesCount = indices.Length;
 
             if (hasBoneWeightData) {
@@ -580,8 +586,7 @@ namespace Draco {
             mesh.SetSubMesh(0, submeshDescriptor, flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
 
-#if DRACO_MESH_DATA
-#else
+#if !DRACO_MESH_DATA
             Profiler.BeginSample("Dispose");
             indices.Dispose();
             foreach (var nativeArray in vData) {
@@ -676,6 +681,8 @@ namespace Draco {
             public int numFaces;
             public int numVertices;
             public int numAttributes;
+
+            public IndexFormat indexFormat => numVertices >= ushort.MaxValue ? IndexFormat.UInt32 : IndexFormat.UInt16;
         }
 
         // Release data associated with DracoMesh.
@@ -720,7 +727,7 @@ namespace Draco {
         // input, indices must be null. The returned indices must be released with
         // ReleaseDracoData.
         [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetMeshIndices(
-            DracoMesh* mesh, DracoData**indices, bool flip);
+            DracoMesh* mesh, DracoData**indices, DataType dataType, bool flip);
         // Returns an array of attribute data as well as the type of data in
         // data_type. On input, data must be null. The returned data must be
         // released with ReleaseDracoData.
@@ -790,6 +797,34 @@ namespace Draco {
             public override int elementSize => m_elementSize;
         }
 
+#if !DRACO_MESH_DATA
+        abstract class NativeIndexBufferBase : IDisposable {
+            public abstract void* unsafePtr {get;}
+            public abstract int Length {get;}
+            public abstract void SetMeshIndexBufferData(Mesh mesh);
+            public abstract void Dispose();
+        }
+        
+        class NativeIndexBuffer<T> : NativeIndexBufferBase where T : struct {
+            NativeArray<T> indices;
+
+            public NativeIndexBuffer(int length, Allocator allocator) {
+                indices = new NativeArray<T>(length, allocator, NativeArrayOptions.UninitializedMemory);
+            }
+
+            public override void* unsafePtr => indices.GetUnsafePtr();
+            public override int Length => indices.Length;
+            
+            public override void SetMeshIndexBufferData(Mesh mesh) {
+                mesh.SetIndexBufferData( indices, 0, 0, indices.Length);
+            }
+
+            public override void Dispose() {
+                indices.Dispose();
+            }
+        }
+#endif
+
         [BurstCompile]
         struct DecodeJob : IJob {
             
@@ -848,12 +883,14 @@ namespace Draco {
             public NativeArray<IntPtr> dracoTempResources;
             [ReadOnly]
             public bool flip;
-        
+            [ReadOnly]
+            public DataType dataType; 
 #if DRACO_MESH_DATA
             public Mesh.MeshData mesh;
 #else
-            [WriteOnly]
-            public NativeArray<uint> indices;
+            [NativeDisableUnsafePtrRestriction]
+            public void* indicesPtr;
+            public int indicesLength;
 #endif
 
             public void Execute() {
@@ -862,13 +899,31 @@ namespace Draco {
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* dracoIndices;
-                GetMeshIndices(dracoMesh, &dracoIndices, flip);
+                GetMeshIndices(dracoMesh, &dracoIndices, dataType, flip);
                 int indexSize = DataTypeSize((DataType)dracoIndices->dataType);
                 int* indicesData = (int*)dracoIndices->data;
 #if DRACO_MESH_DATA
-                var indices = mesh.GetIndexData<uint>();
+                void* indicesPtr;
+                int indicesLength;
+
+                switch (dataType) {
+                    case DataType.DT_UINT16: {
+                        var indices = mesh.GetIndexData<ushort>();
+                        indicesPtr = indices.GetUnsafePtr();
+                        indicesLength = indices.Length;
+                        break;
+                    }
+                    case DataType.DT_UINT32: {
+                        var indices = mesh.GetIndexData<uint>();
+                        indicesPtr = indices.GetUnsafePtr();
+                        indicesLength = indices.Length;
+                        break;
+                    }
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
 #endif
-                UnsafeUtility.MemCpy(indices.GetUnsafePtr(), indicesData, indices.Length * indexSize);
+                UnsafeUtility.MemCpy(indicesPtr, indicesData, indicesLength * indexSize);
                 ReleaseDracoData(&dracoIndices);
             }
         }
