@@ -4,8 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 
+## [3.2.0] - 2021-08-27 
 ### Changed
+- Improved render performance by reducing vertex streams for small meshes (see related [issue](https://github.com/atteneder/glTFast/issues/197))
 - Less memory usage and better performance by creating 16-bit unsigned integer indices for small meshes
 - Less memory usage by avoiding a temporary index buffer in native plug-in
 - Raised version of Burst dependency to 1.4.11 (current verified)
