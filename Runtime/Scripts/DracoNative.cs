@@ -109,10 +109,12 @@ namespace Draco {
         NativeArray<int> dracoDecodeResult;
         NativeArray<IntPtr> dracoTempResources;
 
+        bool isPointCloud;
+
 #if DRACO_MESH_DATA
         Mesh.MeshData mesh;
         int indicesCount;
-        bool isPointCloud;
+        
 #else
         Mesh mesh;
         int streamCount;
@@ -522,9 +524,9 @@ namespace Draco {
                 );
             
             Profiler.BeginSample("SetParameters");
+            isPointCloud = dracoMesh->isPointCloud;
 #if DRACO_MESH_DATA
             indicesCount = dracoMesh->numFaces * 3;
-            isPointCloud = dracoMesh->isPointCloud;
 #else
             mesh = new Mesh();
 #endif
