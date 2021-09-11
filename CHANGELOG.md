@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.2.0] - 2021-08-27 
+## [3.3.0] - 2021-09-11
+### Added
+- Point cloud support (thanks [@camnewnham][camnewnham] for #28)
+
+## [3.2.0] - 2021-08-27
 ### Changed
 - Improved render performance by reducing vertex streams for small meshes (see related [issue](https://github.com/atteneder/glTFast/issues/197))
 - Less memory usage and better performance by creating 16-bit unsigned integer indices for small meshes
@@ -99,3 +103,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] - 2019-07-11
 - Initial release
+
+[camnewnham]: https://github.com/camnewnham
