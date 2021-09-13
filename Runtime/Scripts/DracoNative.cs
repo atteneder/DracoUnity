@@ -190,7 +190,7 @@ namespace Draco {
             attributes = new List<AttributeMapBase>();
             var attributeTypes = new HashSet<VertexAttribute>();
             
-            bool CreateAttributeMaps(AttributeType attributeType, int count, DracoMesh* draco) {
+            bool CreateAttributeMaps(AttributeType attributeType, int count, DracoMesh* draco, bool normalized = false) {
                 bool foundAttribute = false;
                 for (var i = 0; i < count; i++) {
                     var type = GetVertexAttribute(attributeType, i);
@@ -212,7 +212,7 @@ namespace Draco {
 
                     DracoAttribute* attribute = null;
                     if (GetAttributeByType(draco, attributeType, i, &attribute)) {
-                        var format = GetVertexAttributeFormat((DataType)attribute->dataType);
+                        var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                         if (!format.HasValue) { continue; }
                         var map = new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value));
                         attributes.Add(map);
@@ -227,7 +227,7 @@ namespace Draco {
                 return foundAttribute;
             }
             
-            bool CreateAttributeMapById(VertexAttribute type, int id, DracoMesh* draco, out AttributeMap map) {
+            bool CreateAttributeMapById(VertexAttribute type, int id, DracoMesh* draco, out AttributeMap map, bool normalized = false) {
                 map = null;
                 if (attributeTypes.Contains(type)) {
 #if UNITY_EDITOR
@@ -239,7 +239,7 @@ namespace Draco {
 
                 DracoAttribute* attribute;
                 if (GetAttributeByUniqueId(draco, id, &attribute)) {
-                    var format = GetVertexAttributeFormat((DataType)attribute->dataType);
+                    var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                     if (!format.HasValue) { return false; }
 
                     map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
@@ -253,7 +253,7 @@ namespace Draco {
             // https://docs.unity3d.com/2020.1/Documentation/ScriptReference/Rendering.VertexAttributeDescriptor.html
             //
             CreateAttributeMaps(AttributeType.POSITION, 1, dracoMesh);
-            var hasNormals = CreateAttributeMaps(AttributeType.NORMAL, 1, dracoMesh);
+            var hasNormals = CreateAttributeMaps(AttributeType.NORMAL, 1, dracoMesh, true);
             calculateNormals = !hasNormals && requireNormals;
             if (calculateNormals) {
                 calculateNormals = true;
@@ -262,12 +262,12 @@ namespace Draco {
             if (requireTangents) {
                 attributes.Add(new CalculatedAttributeMap(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 4 ));
             }
-            var hasTexCoordOrColor = CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh);
-            hasTexCoordOrColor |= CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh);
+            var hasTexCoordOrColor = CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh, true);
+            hasTexCoordOrColor |= CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh, true);
 
             var hasSkinning = false;
             if (weightsAttributeId >= 0) {
-                if (CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh, out var map)) {
+                if (CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh, out var map, true)) {
                     // BLENDHACK: Don't add bone weights, as they won't exist after Mesh.SetBoneWeights
                     // attributes.Add(map);
                     boneWeightMap = map;
@@ -1171,16 +1171,16 @@ namespace Draco {
             }
         }
       
-        VertexAttributeFormat? GetVertexAttributeFormat(DataType inputType) {
+        VertexAttributeFormat? GetVertexAttributeFormat(DataType inputType, bool normalized = false) {
             switch (inputType) {
                 case DataType.DT_INT8:
-                    return VertexAttributeFormat.SInt8;
+                    return normalized ? VertexAttributeFormat.SNorm8 : VertexAttributeFormat.SInt8;
                 case DataType.DT_UINT8:
-                    return VertexAttributeFormat.UInt8;
+                    return normalized ? VertexAttributeFormat.UNorm8 : VertexAttributeFormat.UInt8;
                 case DataType.DT_INT16:
-                    return VertexAttributeFormat.SInt16;
+                    return normalized ? VertexAttributeFormat.SNorm16 : VertexAttributeFormat.SInt16;
                 case DataType.DT_UINT16:
-                    return VertexAttributeFormat.UInt16;
+                    return normalized ? VertexAttributeFormat.UNorm16 : VertexAttributeFormat.UInt16;
                 case DataType.DT_INT32:
                     return VertexAttributeFormat.SInt32;
                 case DataType.DT_UINT32:
