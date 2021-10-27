@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 
+### Added
+- Error message when users try to run DracoUnity 3.x Unity >=2021.2 combination targeting WebGL
+
 ## [3.3.1] - 2021-09-14
 ### Changed
 - Data types SInt8, UInt8, SInt16 and UInt16 on normals, colors, texture coordinates and blend weights are treated as normalized values now
