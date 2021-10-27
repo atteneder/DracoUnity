@@ -131,11 +131,17 @@ namespace Draco {
                 result.boneWeightData.ApplyOnMesh(unityMesh);
                 result.boneWeightData.Dispose();
             }
-            if (result.calculateNormals) {
-                unityMesh.RecalculateNormals();
-            }
-            if (requireTangents) {
-                unityMesh.RecalculateTangents();
+
+            if (unityMesh.GetTopology(0) == MeshTopology.Triangles)
+            {
+                if (result.calculateNormals)
+                {
+                    unityMesh.RecalculateNormals();
+                }
+                if (requireTangents)
+                {
+                    unityMesh.RecalculateTangents();
+                }
             }
             return unityMesh;
 #else
@@ -397,17 +403,19 @@ namespace Draco {
 
 #if !DRACO_MESH_DATA
             var result = dracoNative.PopulateMeshData();
-            if (calculateNormals) {
-                // TODO: Consider doing this in a threaded Job
-                Profiler.BeginSample("RecalculateNormals");
-                result.RecalculateNormals();
-                Profiler.EndSample();
-            }
-            if (requireTangents) {
-                // TODO: Consider doing this in a threaded Job
-                Profiler.BeginSample("RecalculateTangents");
-                result.RecalculateTangents();
-                Profiler.EndSample();
+            if (result.GetTopology(0) == MeshTopology.Triangles) {
+                if (calculateNormals) {
+                    // TODO: Consider doing this in a threaded Job
+                    Profiler.BeginSample("RecalculateNormals");
+                    result.RecalculateNormals();
+                    Profiler.EndSample();
+                }
+                if (requireTangents) {
+                    // TODO: Consider doing this in a threaded Job
+                    Profiler.BeginSample("RecalculateTangents");
+                    result.RecalculateTangents();
+                    Profiler.EndSample();
+                }
             }
 #else
             result.success = dracoNative.PopulateMeshData();

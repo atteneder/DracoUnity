@@ -194,6 +194,7 @@ This project is a fork of the [existing Unity integration](https://github.com/go
 - Supports single meshes with more than 65536 vertices (old split algorithm was broken)
 - Supports loading joint index and joint weights for skinning
 - Corrects tangents by re-calculating them if necessary
+- Point cloud support
 - Additional native libs and support for platforms
   - WebGL
   - iOS armv7(s) and arm64

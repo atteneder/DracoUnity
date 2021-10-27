@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebGL library is built with Emscripten 2.0.19 now
 - Minimum required version is Unity 2021.2
 
+## [3.3.1] - 2021-09-14
+### Changed
+- Data types SInt8, UInt8, SInt16 and UInt16 on normals, colors, texture coordinates and blend weights are treated as normalized values now
+### Fixed
+- Correct vertex colors (#27)
+
+## [3.3.0] - 2021-09-11
+### Added
+- Point cloud support (thanks [@camnewnham][camnewnham] for #28)
+
+## [3.2.0] - 2021-08-27
+### Changed
+- Improved render performance by reducing vertex streams for small meshes (see related [issue](https://github.com/atteneder/glTFast/issues/197))
+- Less memory usage and better performance by creating 16-bit unsigned integer indices for small meshes
+- Less memory usage by avoiding a temporary index buffer in native plug-in
+- Raised version of Burst dependency to 1.4.11 (current verified)
+
 ## [3.1.0] - 2020-07-12
 ### Added
 - `forceUnityLayout` parameter, to enforce a blend-shape and skinning compatible vertex buffer layout
@@ -97,3 +114,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] - 2019-07-11
 - Initial release
+
+[camnewnham]: https://github.com/camnewnham
