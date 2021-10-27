@@ -21,8 +21,8 @@ namespace Draco.Editor {
         
         [UnityEditor.Callbacks.DidReloadScripts]
         static void OnScriptsReloaded() {
-#if UNITY_WEBGL && UNITY_2021_2_OR_NEWER
-            Debug.LogError("Update DracoUnity to version 4.0.0 or newer!\nWith Unity 2021.2 or newer that is required for successful WebGL builds!");
+#if UNITY_WEBGL && !UNITY_2021_2_OR_NEWER
+            Debug.LogError("Downgrade DracoUnity to version 3.x!\nWebGL builds will not succeed with DracoUnity 4.0.0 or newer and Unity versions older than 2021.2.");
 #endif
         }
     }
