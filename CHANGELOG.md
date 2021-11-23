@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.0.1] - 2021-11-23
 ### Fixed
-- Apple Silicon Unity Editor decoding
+- Apple Silicon Unity Editor decoding (#34)
 - Apple Silicon Runtime encoding
 
 ## [4.0.0] - 2021-10-27
