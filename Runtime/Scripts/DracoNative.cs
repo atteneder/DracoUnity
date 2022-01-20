@@ -940,7 +940,8 @@ namespace Draco {
                         break;
                     }
                     default:
-                        throw new ArgumentOutOfRangeException();
+                        result[0] = -1;
+                        return;
                 }
 #endif
                 GetMeshIndices(dracoMesh, dataType, indicesPtr, indicesLength, flip);
