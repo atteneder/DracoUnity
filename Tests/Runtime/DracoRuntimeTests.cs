@@ -19,18 +19,20 @@ namespace Draco.Tests
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att_sub_o_2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att_sub_o_no_metadata.drc",
             
-            // // Point clouds are not supported
+            // Point clouds
+            "https://raw.githubusercontent.com/google/draco/master/testdata/pc_kd_color.drc",
+            "https://raw.githubusercontent.com/google/draco/master/testdata/point_cloud_no_qp.drc",
+
+            // // Legacy point cloud versions not supported
             // "https://raw.githubusercontent.com/google/draco/master/testdata/cube_pc.drc",
             // "https://raw.githubusercontent.com/google/draco/master/testdata/pc_color.drc",
-            // "https://raw.githubusercontent.com/google/draco/master/testdata/pc_kd_color.drc",
-            // "https://raw.githubusercontent.com/google/draco/master/testdata/point_cloud_no_qp.drc",
             
             // // Legacy versions not supported
             // "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.0.10.0.drc",
             // "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.0.9.1.drc",
             // "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.1.0.0.drc",
             // "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.1.1.0.drc",
-            "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.1.2.0.drc",
+            //"https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.1.2.0.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.cl10.2.2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.cl4.2.2.drc",
             
@@ -40,7 +42,7 @@ namespace Draco.Tests
             // "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.1.0.0.drc",
             // "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.1.1.0.drc",
             
-            "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.1.2.0.drc",
+            //"https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.1.2.0.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.cl3.2.2.drc",
             
             // // Legacy versions not supported
@@ -58,10 +60,8 @@ namespace Draco.Tests
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att.obj.sequential.cl3.2.2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att_sub_o_2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att_sub_o_no_metadata.drc",
-            "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.1.2.0.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.cl10.2.2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.cl4.2.2.drc",
-            "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.1.2.0.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.cl3.2.2.drc",
         })]
         public IEnumerator LoadDracoOfficialTestDataNormals(string url) {
@@ -76,10 +76,8 @@ namespace Draco.Tests
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att.obj.sequential.cl3.2.2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att_sub_o_2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/cube_att_sub_o_no_metadata.drc",
-            "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.1.2.0.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.cl10.2.2.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.edgebreaker.cl4.2.2.drc",
-            "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.1.2.0.drc",
             "https://raw.githubusercontent.com/google/draco/master/testdata/test_nm.obj.sequential.cl3.2.2.drc",
         })]
         public IEnumerator LoadDracoOfficialTestDataNormalsTangents(string url) {
