@@ -215,9 +215,7 @@ namespace Draco {
                         var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                         if (!format.HasValue) { continue; }
                         // Color may need padding
-                        var map = ((AttributeType)attribute->attributeType == AttributeType.COLOR) ?
-                            new PaddedColorAttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value))
-                            : new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value)); attributes.Add(map);
+                        var map = new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value)); attributes.Add(map);
                         attributeTypes.Add(type.Value);
                         foundAttribute = true;
                     }
@@ -245,9 +243,7 @@ namespace Draco {
                     if (!format.HasValue) { return false; }
 
                     // Color may need padding
-                    map = ((AttributeType) attribute->attributeType == AttributeType.COLOR) ?
-                        new PaddedColorAttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type))
-                        : new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
+                    map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
                     attributeTypes.Add(type);
                     return true;
                 }
@@ -801,36 +797,27 @@ namespace Draco {
                 this.convertSpace = convertSpace;
             }
 
-            public override int numComponents => dracoAttribute->numComponents;
-            public override int elementSize => DataTypeSize((DataType)dracoAttribute->dataType) * dracoAttribute->numComponents;
-
-            public override void Dispose() {
-                var tmp = dracoAttribute;
-                ReleaseDracoAttribute(&tmp);
-                dracoAttribute = null;
-            }
-        }
-
-        /// <summary>
-        /// Attribute map for the color attribute, with an increased numcomponents for when the attribute is RGB and byte or ushort
-        /// Unity specifies attribute data size must be multiple of 4
-        /// </summary>
-        class PaddedColorAttributeMap : AttributeMap
-        {
-            public PaddedColorAttributeMap(DracoAttribute* dracoAttribute, VertexAttribute attribute, VertexAttributeFormat format, bool convertSpace) : base(dracoAttribute, attribute, format, convertSpace)
-            {
-                
-            }
-
+            /// <summary>
+            /// Unity specifies that attribute data size must be divisible by 4.  
+            /// This value may contain an additional pad to meet this requirement.  
+            /// </summary>
             public override int numComponents
             {
                 get
                 {
-                    if (base.elementSize % 4 == 0)
+                    int dracoElemSize = DataTypeSize((DataType)dracoAttribute->dataType) * dracoAttribute->numComponents;
+
+                    if (dracoElemSize % 4 == 0)
                     {
                         return dracoAttribute->numComponents;
                     }
-                    return dracoAttribute->numComponents + 1;
+                    else
+                    {
+                        // Pad such that element size is divisible by 4.
+                        int padBytes = 4 - dracoElemSize % 4;
+                        int padComponents = padBytes / DataTypeSize((DataType)dracoAttribute->dataType);
+                        return dracoAttribute->numComponents + padComponents;
+                    }
                 }
             }
 
@@ -841,8 +828,13 @@ namespace Draco {
                     return numComponents * DataTypeSize((DataType)dracoAttribute->dataType);
                 }
             }
-        }
 
+            public override void Dispose() {
+                var tmp = dracoAttribute;
+                ReleaseDracoAttribute(&tmp);
+                dracoAttribute = null;
+            }
+        }
 
         class CalculatedAttributeMap : AttributeMapBase {
             public int m_numComponents;
