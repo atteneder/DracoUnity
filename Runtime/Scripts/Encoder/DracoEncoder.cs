@@ -178,14 +178,12 @@ namespace Draco.Encoder {
 
                 var submesh = mesh.GetSubMesh(submeshIndex);
                 
-                if (submesh.topology != MeshTopology.Triangles) {
-                    Debug.LogError("Only triangles are supported");
+                if (submesh.topology != MeshTopology.Triangles && submesh.topology != MeshTopology.Points) {
+                    Debug.LogError($"Mesh topology {submesh.topology} is not supported");
                     return null;
                 }
-                var indices = mesh.GetIndices(submeshIndex);
-                var faceCount = indices.Length / 3;
                 
-                var dracoEncoder = dracoEncoderCreate(mesh.vertexCount);
+                var dracoEncoder = submesh.topology == MeshTopology.Triangles ? dracoEncoderCreate(mesh.vertexCount) : dracoEncoderCreatePointCloud(mesh.vertexCount);
 
                 var attributeIds = new Dictionary<VertexAttribute, uint>();
 
@@ -199,9 +197,13 @@ namespace Draco.Encoder {
                     attributeIds[attribute] = dracoEncoderSetAttribute(dracoEncoder, (int) GetAttributeType(attribute), GetDataType(format), dimension, stride, baseAddr);
                 }
 
-                var indicesData = (IntPtr) UnsafeUtility.PinGCArrayAndGetDataAddress(indices, out var gcHandle);
-                dracoEncoderSetIndices(dracoEncoder, DataType.DT_UINT32, (uint) indices.Length, indicesData);
-                UnsafeUtility.ReleaseGCObject(gcHandle);
+                if (submesh.topology == MeshTopology.Triangles)
+                {
+                    var indices = mesh.GetIndices(submeshIndex);
+                    var indicesData = (IntPtr)UnsafeUtility.PinGCArrayAndGetDataAddress(indices, out var gcHandle);
+                    dracoEncoderSetIndices(dracoEncoder, DataType.DT_UINT32, (uint)indices.Length, indicesData);
+                    UnsafeUtility.ReleaseGCObject(gcHandle);
+                }
 
                 // For both encoding and decoding (0 = slow and best compression; 10 = fast) 
                 dracoEncoderSetCompressionSpeed(dracoEncoder, Mathf.Clamp(encodingSpeed,0,10), Mathf.Clamp(decodingSpeed,0,10));
@@ -327,6 +329,9 @@ namespace Draco.Encoder {
         [DllImport (DRACOENC_UNITY_LIB)]
         static extern IntPtr dracoEncoderCreate(int vertexCount);
         
+        [DllImport(DRACOENC_UNITY_LIB)]
+        static extern IntPtr dracoEncoderCreatePointCloud(int vertexCount);
+
         [DllImport (DRACOENC_UNITY_LIB)]
         static extern void dracoEncoderRelease(IntPtr encoder);
         
