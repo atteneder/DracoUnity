@@ -214,8 +214,8 @@ namespace Draco {
                     if (GetAttributeByType(draco, attributeType, i, &attribute)) {
                         var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                         if (!format.HasValue) { continue; }
-                        var map = new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value));
-                        attributes.Add(map);
+                        // Color may need padding
+                        var map = new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value)); attributes.Add(map);
                         attributeTypes.Add(type.Value);
                         foundAttribute = true;
                     }
@@ -242,6 +242,7 @@ namespace Draco {
                     var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                     if (!format.HasValue) { return false; }
 
+                    // Color may need padding
                     map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
                     attributeTypes.Add(type);
                     return true;
@@ -436,6 +437,7 @@ namespace Draco {
                         attribute = map.dracoAttribute,
                         stride = streamStrides[map.stream],
                         flip = map.convertSpace,
+                        componentStride = map.numComponents,
 #if DRACO_MESH_DATA                        
                         mesh = mesh, 
                         streamIndex = map.stream, 
@@ -452,6 +454,7 @@ namespace Draco {
                         dracoTempResources = dracoTempResources,
                         attribute = map.dracoAttribute,
                         flip = map.convertSpace,
+                        componentStride = map.numComponents,
 #if DRACO_MESH_DATA                        
                         mesh = mesh, 
                         streamIndex = map.stream
@@ -753,7 +756,7 @@ namespace Draco {
         // data_type. On input, data must be null. The returned data must be
         // released with ReleaseDracoData.
         [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttributeData(
-            DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip);
+            DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip, int component_stride);
 
         abstract class AttributeMapBase : IComparable<AttributeMapBase> {
             readonly public VertexAttribute attribute;
@@ -794,8 +797,37 @@ namespace Draco {
                 this.convertSpace = convertSpace;
             }
 
-            public override int numComponents => dracoAttribute->numComponents;
-            public override int elementSize => DataTypeSize((DataType)dracoAttribute->dataType) * dracoAttribute->numComponents;
+            /// <summary>
+            /// Unity specifies that attribute data size must be divisible by 4.  
+            /// This value may contain an additional pad to meet this requirement.  
+            /// </summary>
+            public override int numComponents
+            {
+                get
+                {
+                    int dracoElemSize = DataTypeSize((DataType)dracoAttribute->dataType) * dracoAttribute->numComponents;
+
+                    if (dracoElemSize % 4 == 0)
+                    {
+                        return dracoAttribute->numComponents;
+                    }
+                    else
+                    {
+                        // Pad such that element size is divisible by 4.
+                        int padBytes = 4 - dracoElemSize % 4;
+                        int padComponents = padBytes / DataTypeSize((DataType)dracoAttribute->dataType);
+                        return dracoAttribute->numComponents + padComponents;
+                    }
+                }
+            }
+
+            public override int elementSize
+            {
+                get
+                {
+                    return numComponents * DataTypeSize((DataType)dracoAttribute->dataType);
+                }
+            }
 
             public override void Dispose() {
                 var tmp = dracoAttribute;
@@ -804,7 +836,6 @@ namespace Draco {
             }
         }
 
-        
         class CalculatedAttributeMap : AttributeMapBase {
             public int m_numComponents;
             public int m_elementSize;
@@ -963,6 +994,9 @@ namespace Draco {
             [ReadOnly]
             public bool flip;
 
+            [ReadOnly]
+            public int componentStride;
+
 #if DRACO_MESH_DATA
             public Mesh.MeshData mesh;
             [ReadOnly]
@@ -979,8 +1013,8 @@ namespace Draco {
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
-                GetAttributeData(dracoMesh, attribute, &data, flip);
-                var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
+                GetAttributeData(dracoMesh, attribute, &data, flip, componentStride);
+                var elementSize = DataTypeSize((DataType)data->dataType) * componentStride;
 #if DRACO_MESH_DATA
                 var dst = mesh.GetVertexData<byte>(streamIndex);
                 var dstPtr = dst.GetUnsafePtr();
@@ -1008,6 +1042,9 @@ namespace Draco {
             [ReadOnly]
             public bool flip;
 
+            [ReadOnly]
+            public int componentStride;
+
 #if DRACO_MESH_DATA
             public Mesh.MeshData mesh;
             [ReadOnly]
@@ -1025,8 +1062,8 @@ namespace Draco {
                 }
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
                 DracoData* data = null;
-                GetAttributeData(dracoMesh, attribute, &data, flip);
-                var elementSize = DataTypeSize((DataType)data->dataType) * attribute->numComponents;
+                GetAttributeData(dracoMesh, attribute, &data, flip, componentStride);
+                var elementSize = DataTypeSize((DataType)data->dataType) * componentStride;
 #if DRACO_MESH_DATA
                 var dst = mesh.GetVertexData<byte>(streamIndex);
                 var dstPtr =  ((byte*)dst.GetUnsafePtr()) + offset;
@@ -1071,12 +1108,12 @@ namespace Draco {
                 var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
 
                 DracoData* indicesData = null;
-                GetAttributeData(dracoMesh, indicesAttribute, &indicesData, false);
+                GetAttributeData(dracoMesh, indicesAttribute, &indicesData, false, indicesAttribute->numComponents);
                 var indicesDataType = (DataType)indicesData->dataType;
                 var indexSize = DataTypeSize((DataType)indicesData->dataType) * indicesAttribute->numComponents;
                 
                 DracoData* weightsData = null;
-                GetAttributeData(dracoMesh, weightsAttribute, &weightsData, false);
+                GetAttributeData(dracoMesh, weightsAttribute, &weightsData, false, weightsAttribute->numComponents);
                 var weightSize = DataTypeSize((DataType)weightsData->dataType) * weightsAttribute->numComponents;
                 
                 for (var v = 0; v < dracoMesh->numVertices; v++) {
