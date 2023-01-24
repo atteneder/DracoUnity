@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Rendering;
 using UnityEngine.TestTools;
 
 namespace Draco.Tests
@@ -136,6 +137,27 @@ namespace Draco.Tests
                 }
             }
             await Task.Yield();
+        }
+
+        [Test]
+        public void EncodePointCloud() {
+            
+            var sphereGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            var sphere = sphereGo.GetComponent<MeshFilter>().sharedMesh;
+            var vertices = sphere.vertices;
+            
+            var mesh = new Mesh {
+                subMeshCount = 1
+            };
+            mesh.SetSubMesh(0,new SubMeshDescriptor(0,0,MeshTopology.Points));
+            mesh.vertices = vertices;
+
+            var result = Draco.Encoder.DracoEncoder.EncodeMesh(mesh);
+            Assert.NotNull(result);
+            Assert.AreEqual(1, result.Length);
+            Assert.Equals(2330, result[0].data.Length);
+            
+            result[0].Dispose();
         }
     }
 }
