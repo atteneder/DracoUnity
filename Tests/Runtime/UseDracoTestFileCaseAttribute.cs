@@ -46,9 +46,9 @@ namespace Draco.Tests {
                 foreach (var testCase in m_sampleSet) {
                     var data = new TestCaseData(new object[] { testCase });
 
-                    var uri = new Uri(testCase);
+                    var uri = new Uri(testCase, UriKind.RelativeOrAbsolute);
 
-                    string origName = System.IO.Path.GetFileName(uri.LocalPath);
+                    var origName = Path.GetFileName(testCase);
                     string name;
                     if (nameCounts.TryGetValue(origName, out int count)) {
                         name = string.Format("{0}-{1}", origName, count);
