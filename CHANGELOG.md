@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for encoding point clouds (thanks [@camnewnham][camnewnham] for #46)
 ### Fixed
 - Unit Tests download URLs updated
+- Editor imports now calculate the correct mesh bounds
 
 ## [3.3.2] - 2021-10-27 
 ### Added
