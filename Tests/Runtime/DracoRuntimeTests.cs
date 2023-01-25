@@ -153,7 +153,7 @@ namespace Draco.Tests
             var result = Draco.Encoder.DracoEncoder.EncodeMesh(mesh);
             Assert.NotNull(result);
             Assert.AreEqual(1, result.Length);
-            Assert.Equals(2330, result[0].data.Length);
+            Assert.AreEqual(2330, result[0].data.Length);
             
             result[0].Dispose();
         }
