@@ -212,10 +212,16 @@ namespace Draco {
 
                     DracoAttribute* attribute = null;
                     if (GetAttributeByType(draco, attributeType, i, &attribute)) {
-                        var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
+                        var format = GetVertexAttributeFormat(
+                            (DataType)attribute->dataType, normalized);
                         if (!format.HasValue) { continue; }
-                        // Color may need padding
-                        var map = new AttributeMap(attribute, type.Value, format.Value, convertSpace && ConvertSpace(type.Value)); attributes.Add(map);
+                        var map = new AttributeMap(
+                            attribute,
+                            type.Value,
+                            format.Value,
+                            convertSpace && ConvertSpace(type.Value)
+                            );
+                        attributes.Add(map);
                         attributeTypes.Add(type.Value);
                         foundAttribute = true;
                     }
@@ -242,7 +248,6 @@ namespace Draco {
                     var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                     if (!format.HasValue) { return false; }
 
-                    // Color may need padding
                     map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
                     attributeTypes.Add(type);
                     return true;
