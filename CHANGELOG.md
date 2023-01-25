@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for encoding point clouds (thanks [@camnewnham][camnewnham] for #46)
 - Point cloud encoding unit test
 - Component pad byte support enables things like 3 byte RGB color vertex attributes (thanks [@camnewnham][camnewnham] for #47)
+### Changed
+- Minimum required Unity version is 2020.3 LTS now
 ### Fixed
 - Unit Tests download URLs updated
 - Editor imports now calculate the correct mesh bounds
