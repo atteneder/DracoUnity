@@ -25,17 +25,15 @@ namespace Draco.Tests
             "cube_att_sub_o_2.drc",
             "cube_att_sub_o_no_metadata.drc",
             "octagon_preserved.drc",
+            "pc_kd_color.drc",
+            "point_cloud_no_qp.drc",
             "test_nm.obj.edgebreaker.cl10.2.2.drc",
             "test_nm.obj.edgebreaker.cl4.2.2.drc",
             "test_nm.obj.sequential.cl3.2.2.drc",
             
-            // // Point clouds are not supported
+            // // Legacy versions not supported
             // "cube_pc.drc",
             // "pc_color.drc",
-            // "pc_kd_color.drc",
-            // "point_cloud_no_qp.drc",
-            
-            // // Legacy versions not supported
             // "test_nm.obj.edgebreaker.0.10.0.drc",
             // "test_nm.obj.edgebreaker.0.9.1.drc",
             // "test_nm.obj.edgebreaker.1.0.0.drc",
