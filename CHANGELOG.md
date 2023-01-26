@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebGL library is built with Emscripten 2.0.19 now
 - Minimum required version is Unity 2021.2
 
+## [Unreleased]
+### Added
+- Support for encoding point clouds (thanks [@camnewnham][camnewnham] for #46)
+- Point cloud encoding unit test
+- Component pad byte support enables things like 3 byte RGB color vertex attributes (thanks [@camnewnham][camnewnham] for #47)
+### Changed
+- Minimum required Unity version is 2020.3 LTS now
+### Fixed
+- Unit Tests download URLs updated
+- Editor imports now calculate the correct mesh bounds
+
 ## [3.3.2] - 2021-10-27 
 ### Added
 - Error message when users try to run DracoUnity 3.x Unity >=2021.2 combination targeting WebGL

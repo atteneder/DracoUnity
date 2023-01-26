@@ -34,6 +34,7 @@ namespace Draco.Editor {
                 Debug.LogError("Import draco file failed");
                 return;
             }
+            mesh.RecalculateBounds();
             ctx.AddObjectToAsset("mesh", mesh);
             ctx.SetMainObject(mesh);
         }
