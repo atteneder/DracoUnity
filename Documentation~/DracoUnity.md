@@ -10,7 +10,7 @@ Following build targets are supported
 - Windows (64 and 32 bit)
 - Universal Windows Platform (x64,x86,ARM,ARM64)
 - macOS (Apple Silicon an Intel)
-- Linux (64 and 32 bit)
+- Linux (64 bit)
 - Lumin / Magic Leap
 
 > Note: Burst support is broken on iOS builds at the moment. Please deactivate Burst AOT in the project settings until this is resolved.

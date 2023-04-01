@@ -16,7 +16,7 @@ Following build targets are supported
 - Windows (64 and 32 bit)
 - Universal Windows Platform (x64,x86,ARM,ARM64)
 - macOS (Apple Silicon an Intel)
-- Linux (64 and 32 bit)
+- Linux (64 bit)
 - Lumin / Magic Leap
 
 > Note: Burst support is broken on iOS builds at the moment. Please deactivate Burst AOT in the project settings until this is resolved.
@@ -199,7 +199,7 @@ This project is a fork of the [existing Unity integration](https://github.com/go
   - WebGL
   - iOS armv7(s) and arm64
   - Windows 32-bit
-  - Linux 64-bit and 32-bit
+  - Linux 64-bit
   - Android x86
   - Universal Windows Platform (x64,x86,ARM,ARM64)
   - macOS Apple Silicon
