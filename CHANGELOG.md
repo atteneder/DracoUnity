@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for encoding point clouds (thanks [@camnewnham][camnewnham] for #46)
 - Point cloud encoding unit test
 - Component pad byte support enables things like 3 byte RGB color vertex attributes (thanks [@camnewnham][camnewnham] for #47)
+- Encoding binaries for remaining platforms (Android, WSA, WebGL, iOS and Windows 32-bit)
 ### Changed
 - Minimum required Unity version is 2020.3 LTS now
+- Updated Draco native library binaries to [1.1.0](https://github.com/atteneder/draco/releases/tag/unity1.1.0)
 ### Removed
 - 32-bit Linux binaries/support
 ### Fixed
