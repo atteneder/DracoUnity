@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2023-04-14
+### Added
+- Support for encoding point clouds (thanks [@camnewnham][camnewnham] for #46)
+- Point cloud encoding unit test
+- Component pad byte support enables things like 3 byte RGB color vertex attributes (thanks [@camnewnham][camnewnham] for #47)
+- Encoding binaries for remaining platforms (Android, WSA, WebGL, iOS and Windows 32-bit)
+### Changed
+- Updated Draco native library binaries to [1.1.0](https://github.com/atteneder/draco/releases/tag/unity1.1.0)
+### Removed
+- 32-bit Linux binaries/support
+### Fixed
+- Unit Tests download URLs updated
+- Editor imports now calculate the correct mesh bounds
+- macOS binaries are now loaded on Apple Silicon properly
+
 ## [4.0.2] - 2022-01-20
 ### Fixed
 - Theoretical crash on unsupported indices data type. Removes compiler warning about throwing exception in C# job.
