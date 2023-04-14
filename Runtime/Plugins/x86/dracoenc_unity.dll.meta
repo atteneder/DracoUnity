@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 5ca5cf586b9b04faaa5bfbad833ec2cd
+guid: 7df58bdcd6de34419a4cfe3a6677f751
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
@@ -12,26 +12,16 @@ PluginImporter:
   validateReferences: 1
   platformData:
   - first:
-      '': Any
+      : Any
     second:
       enabled: 0
       settings:
-        Exclude Android: 1
         Exclude Editor: 0
-        Exclude Linux: 0
         Exclude Linux64: 0
-        Exclude LinuxUniversal: 0
         Exclude OSXUniversal: 0
         Exclude WebGL: 1
         Exclude Win: 0
         Exclude Win64: 0
-        Exclude iOS: 1
-  - first:
-      Android: Android
-    second:
-      enabled: 0
-      settings:
-        CPU: ARMv7
   - first:
       Any: 
     second:
@@ -44,37 +34,13 @@ PluginImporter:
       settings:
         CPU: x86
         DefaultValueInitialized: true
-        OS: Linux
-  - first:
-      Facebook: Win
-    second:
-      enabled: 1
-      settings:
-        CPU: AnyCPU
-  - first:
-      Facebook: Win64
-    second:
-      enabled: 0
-      settings:
-        CPU: None
-  - first:
-      Standalone: Linux
-    second:
-      enabled: 1
-      settings:
-        CPU: x86
+        OS: Windows
   - first:
       Standalone: Linux64
     second:
       enabled: 1
       settings:
         CPU: None
-  - first:
-      Standalone: LinuxUniversal
-    second:
-      enabled: 1
-      settings:
-        CPU: x86
   - first:
       Standalone: OSXUniversal
     second:
@@ -94,13 +60,10 @@ PluginImporter:
       settings:
         CPU: None
   - first:
-      iPhone: iOS
+      WebGL: WebGL
     second:
       enabled: 0
-      settings:
-        AddToEmbeddedBinaries: false
-        CompileFlags: 
-        FrameworkDependencies: 
+      settings: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 
