@@ -87,7 +87,7 @@ namespace Draco.Editor {
             
             CompressMeshFilters(meshFilters);
             
-            Object.DestroyImmediate(original);
+            Object.DestroyImmediate(root);
         }
 
         [MenuItem("Tools/Draco/Encode Active Scene")]

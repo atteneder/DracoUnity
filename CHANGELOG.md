@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- Destroying temporary copy (instead of original) GameObject when encoding selected GameObject from the menu
+
 ## [4.1.0] - 2023-04-14
 ### Added
 - Support for encoding point clouds (thanks [@camnewnham][camnewnham] for #46)
