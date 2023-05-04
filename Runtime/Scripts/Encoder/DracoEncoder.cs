@@ -48,11 +48,11 @@ namespace Draco.Encoder {
         }
 
         /// <summary>
-        /// Calculates the idea quantization value based on the largest dimension and desired precision
+        /// Calculates the ideal quantization value based on the largest dimension and desired precision
         /// </summary>
         /// <param name="largestDimension">Length of the largest dimension (width/depth/height)</param>
         /// <param name="precision">Desired minimum precision in world units</param>
-        /// <returns></returns>
+        /// <returns>Ideal quantization in bits</returns>
         static int GetIdealQuantization(float largestDimension, float precision) {
             var value = Mathf.RoundToInt(largestDimension / precision);
             var mostSignificantBit = -1;
@@ -66,7 +66,7 @@ namespace Draco.Encoder {
         /// <summary>
         /// Applies Draco compression to a given mesh and returns the encoded result (one per submesh)
         /// The quality and quantization parameters are calculated from the mesh's bounds, its worldScale and desired precision.
-        /// The quantization paramters help to find a balance between compressed size and quality / precision.
+        /// The quantization parameters help to find a balance between compressed size and quality / precision.
         /// </summary>
         /// <param name="unityMesh">Input mesh</param>
         /// <param name="worldScale">Local-to-world scale this mesh is present in the scene</param>
@@ -77,7 +77,7 @@ namespace Draco.Encoder {
         /// <param name="texCoordQuantization">Texture coordinate quantization</param>
         /// <param name="colorQuantization">Color quantization</param>
         /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
-        /// <returns></returns>
+        /// <returns>Encoded data (one per submesh)</returns>
         public static unsafe EncodeResult[] EncodeMesh(
             Mesh unityMesh,
             Vector3 worldScale,
@@ -115,7 +115,7 @@ namespace Draco.Encoder {
         
         /// <summary>
         /// Applies Draco compression to a given mesh and returns the encoded result (one per submesh)
-        /// The quantization paramters help to find a balance between encoded size and quality / precision.
+        /// The quantization parameters help to find a balance between encoded size and quality / precision.
         /// </summary>
         /// <param name="unityMesh">Input mesh</param>
         /// <param name="encodingSpeed">Encoding speed level. 0 means slow and small. 10 is fastest.</param>
@@ -125,7 +125,7 @@ namespace Draco.Encoder {
         /// <param name="texCoordQuantization">Texture coordinate quantization</param>
         /// <param name="colorQuantization">Color quantization</param>
         /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
-        /// <returns></returns>
+        /// <returns>Encoded data (one per submesh)</returns>
         public static unsafe EncodeResult[] EncodeMesh(
             Mesh unityMesh,
             int encodingSpeed = 0,
