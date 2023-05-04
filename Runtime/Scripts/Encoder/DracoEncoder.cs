@@ -64,6 +64,25 @@ namespace Draco.Encoder {
         }
 
         /// <summary>
+        /// Calculates the ideal position quantization value based on an object's world scale, bounds and the desired
+        /// precision in world unit.
+        /// </summary>
+        /// <param name="worldScale">World scale of the object</param>
+        /// <param name="precision">Desired minimum precision in world units</param>
+        /// <param name="bounds"></param>
+        /// <returns>Ideal quantization in bits</returns>
+        static int GetIdealQuantization(Vector3 worldScale, float precision, Bounds bounds) {
+            var scale = new Vector3(Mathf.Abs(worldScale.x), Mathf.Abs(worldScale.y), Mathf.Abs(worldScale.z));
+            var maxSize = Mathf.Max(
+                bounds.extents.x * scale.x,
+                bounds.extents.y * scale.y,
+                bounds.extents.z * scale.z
+                ) * 2;
+            var positionQuantization = GetIdealQuantization(maxSize, precision);
+            return positionQuantization;
+        }
+
+        /// <summary>
         /// Applies Draco compression to a given mesh and returns the encoded result (one per submesh)
         /// The quality and quantization parameters are calculated from the mesh's bounds, its worldScale and desired precision.
         /// The quantization parameters help to find a balance between compressed size and quality / precision.
@@ -96,10 +115,7 @@ namespace Draco.Encoder {
                 return null;
             }
             
-            var bounds = unityMesh.bounds;
-            var scale = new Vector3(Mathf.Abs(worldScale.x), Mathf.Abs(worldScale.y), Mathf.Abs(worldScale.z));
-            var maxSize = Mathf.Max(bounds.extents.x*scale.x, bounds.extents.y*scale.y, bounds.extents.z*scale.z) * 2;
-            var positionQuantization = GetIdealQuantization(maxSize, precision);
+            var positionQuantization = GetIdealQuantization(worldScale, precision, unityMesh.bounds);
 
             return EncodeMesh(
                 unityMesh,
@@ -112,7 +128,52 @@ namespace Draco.Encoder {
                 genericQuantization
                 );
         }
-        
+
+        /// <summary>
+        /// Applies Draco compression to a given mesh/meshData and returns the encoded result (one per submesh)
+        /// The user is responsible for
+        /// <see cref="UnityEngine.Mesh.AcquireReadOnlyMeshData(List&lt;Mesh&gt;)">acquiring the readable MeshData</see>
+        /// and disposing it.
+        /// The quality and quantization parameters are calculated from the mesh's bounds, its worldScale and desired precision.
+        /// The quantization parameters help to find a balance between compressed size and quality / precision.
+        /// </summary>
+        /// <param name="mesh">Input mesh</param>
+        /// <param name="meshData">Previously acquired readable mesh data</param>
+        /// <param name="worldScale">Local-to-world scale this mesh is present in the scene</param>
+        /// <param name="precision">Desired minimum precision in world units</param>
+        /// <param name="encodingSpeed">Encoding speed level. 0 means slow and small. 10 is fastest.</param>
+        /// <param name="decodingSpeed">Decoding speed level. 0 means slow and small. 10 is fastest.</param>
+        /// <param name="normalQuantization">Normal quantization</param>
+        /// <param name="texCoordQuantization">Texture coordinate quantization</param>
+        /// <param name="colorQuantization">Color quantization</param>
+        /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
+        /// <returns>Encoded data (one per submesh)</returns>
+        public static EncodeResult[] EncodeMesh(
+            Mesh mesh,
+            Mesh.MeshData meshData,
+            Vector3 worldScale,
+            float precision = .001f,
+            int encodingSpeed = 0,
+            int decodingSpeed = 4,
+            int normalQuantization = 10,
+            int texCoordQuantization = 12,
+            int colorQuantization = 8,
+            int genericQuantization = 12
+            )
+        {
+            return EncodeMesh(
+                mesh,
+                meshData,
+                encodingSpeed,
+                decodingSpeed,
+                GetIdealQuantization(worldScale, precision, mesh.bounds),
+                normalQuantization,
+                texCoordQuantization,
+                colorQuantization,
+                genericQuantization
+                );
+        }
+
         /// <summary>
         /// Applies Draco compression to a given mesh and returns the encoded result (one per submesh)
         /// The quantization parameters help to find a balance between encoded size and quality / precision.
@@ -135,26 +196,73 @@ namespace Draco.Encoder {
             int texCoordQuantization = 12,
             int colorQuantization = 8,
             int genericQuantization = 12
-            )
+        ) {
+            var dataArray = Mesh.AcquireReadOnlyMeshData(unityMesh);
+            var data = dataArray[0];
+
+            var result = EncodeMesh(
+                unityMesh,
+                data,
+                encodingSpeed,
+                decodingSpeed,
+                positionQuantization,
+                normalQuantization,
+                texCoordQuantization,
+                colorQuantization,
+                genericQuantization
+            );
+            
+            dataArray.Dispose();
+            return result;
+        }
+
+        /// <summary>
+        /// Applies Draco compression to a given mesh/meshData and returns the encoded result (one per submesh)
+        /// The user is responsible for
+        /// <see cref="UnityEngine.Mesh.AcquireReadOnlyMeshData(List&lt;Mesh&gt;)">acquiring the readable MeshData</see>
+        /// and disposing it.
+        /// The quantization parameters help to find a balance between encoded size and quality / precision.
+        /// </summary>
+        /// <param name="mesh">Input mesh</param>
+        /// <param name="meshData">Previously acquired readable mesh data</param>
+        /// <param name="encodingSpeed">Encoding speed level. 0 means slow and small. 10 is fastest.</param>
+        /// <param name="decodingSpeed">Decoding speed level. 0 means slow and small. 10 is fastest.</param>
+        /// <param name="positionQuantization">Vertex position quantization</param>
+        /// <param name="normalQuantization">Normal quantization</param>
+        /// <param name="texCoordQuantization">Texture coordinate quantization</param>
+        /// <param name="colorQuantization">Color quantization</param>
+        /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
+        /// <returns>Encoded data (one per submesh)</returns>
+        // ReSharper disable once MemberCanBePrivate.Global
+        public static unsafe EncodeResult[] EncodeMesh(
+            Mesh mesh,
+            Mesh.MeshData meshData,
+            int encodingSpeed = 0,
+            int decodingSpeed = 4,
+            int positionQuantization = 14,
+            int normalQuantization = 10,
+            int texCoordQuantization = 12,
+            int colorQuantization = 8,
+            int genericQuantization = 12
+        )
         {
 #if UNITY_2020_1_OR_NEWER
-            if (!unityMesh.isReadable) {
+            if (!mesh.isReadable) {
                 Debug.LogError("Mesh is not readable");
                 return null;
             }
             
-            var mesh = unityMesh;
-            var result = new EncodeResult[mesh.subMeshCount];
+            var result = new EncodeResult[meshData.subMeshCount];
             var vertexAttributes = mesh.GetVertexAttributes();
 
             var strides = new int[DracoNative.maxStreamCount];
-            var attrDatas = new Dictionary<VertexAttribute, AttributeData>();
+            var attributeDataDict = new Dictionary<VertexAttribute, AttributeData>();
             
             foreach (var attribute in vertexAttributes) {
-                var attrData = new AttributeData { offset = strides[attribute.stream], stream = attribute.stream };
+                var attributeData = new AttributeData { offset = strides[attribute.stream], stream = attribute.stream };
                 var size = attribute.dimension * GetAttributeSize(attribute.format);
                 strides[attribute.stream] += size;
-                attrDatas[attribute.attribute] = attrData;
+                attributeDataDict[attribute.attribute] = attributeData;
             }
 
             var streamCount = 1;
@@ -164,17 +272,14 @@ namespace Draco.Encoder {
                 streamCount = stream + 1;
             }
 
-            var dataArray = Mesh.AcquireReadOnlyMeshData(mesh);
-            var data = dataArray[0];
-            
             var vData = new NativeArray<byte>[streamCount];
             var vDataPtr = new IntPtr[streamCount];
             for (var stream = 0; stream < streamCount; stream++) {
-                vData[stream] = data.GetVertexData<byte>(stream);
+                vData[stream] = meshData.GetVertexData<byte>(stream);
                 vDataPtr[stream] = (IntPtr) vData[stream].GetUnsafeReadOnlyPtr();
             }
             
-            for (int submeshIndex = 0; submeshIndex < mesh.subMeshCount; submeshIndex++) {
+            for (var submeshIndex = 0; submeshIndex < mesh.subMeshCount; submeshIndex++) {
 
                 var submesh = mesh.GetSubMesh(submeshIndex);
                 
@@ -183,18 +288,25 @@ namespace Draco.Encoder {
                     return null;
                 }
                 
-                var dracoEncoder = submesh.topology == MeshTopology.Triangles ? dracoEncoderCreate(mesh.vertexCount) : dracoEncoderCreatePointCloud(mesh.vertexCount);
+                var dracoEncoder = submesh.topology == MeshTopology.Triangles 
+                    ? dracoEncoderCreate(mesh.vertexCount)
+                    : dracoEncoderCreatePointCloud(mesh.vertexCount);
 
                 var attributeIds = new Dictionary<VertexAttribute, uint>();
 
-                foreach (var pair in attrDatas) {
-                    var attribute = pair.Key;
-                    var attrData = pair.Value;
+                foreach (var (attribute, attrData) in attributeDataDict) {
                     var format = mesh.GetVertexAttributeFormat(attribute);
                     var dimension = mesh.GetVertexAttributeDimension(attribute);
                     var stride = strides[attrData.stream];
                     var baseAddr = vDataPtr[attrData.stream] + attrData.offset;
-                    attributeIds[attribute] = dracoEncoderSetAttribute(dracoEncoder, (int) GetAttributeType(attribute), GetDataType(format), dimension, stride, baseAddr);
+                    attributeIds[attribute] = dracoEncoderSetAttribute(
+                        dracoEncoder,
+                        (int) GetAttributeType(attribute),
+                        GetDataType(format),
+                        dimension,
+                        stride,
+                        baseAddr
+                        );
                 }
 
                 if (submesh.topology == MeshTopology.Triangles)
@@ -235,8 +347,7 @@ namespace Draco.Encoder {
             for (var stream = 0; stream < streamCount; stream++) {
                 vData[stream].Dispose();
             }
-            dataArray.Dispose();
-            
+
             return result;
 #else
             Debug.LogError("Draco Encoding only works on Unity 2020.1 or newer");
