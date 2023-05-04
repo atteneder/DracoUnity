@@ -78,7 +78,7 @@ namespace Draco.Encoder {
         /// <param name="colorQuantization">Color quantization</param>
         /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
         /// <returns>Encoded data (one per submesh)</returns>
-        public static unsafe EncodeResult[] EncodeMesh(
+        public static EncodeResult[] EncodeMesh(
             Mesh unityMesh,
             Vector3 worldScale,
             float precision = .001f,
@@ -126,7 +126,7 @@ namespace Draco.Encoder {
         /// <param name="colorQuantization">Color quantization</param>
         /// <param name="genericQuantization">Generic quantization (e.g. blend weights and indices). unused at the moment</param>
         /// <returns>Encoded data (one per submesh)</returns>
-        public static unsafe EncodeResult[] EncodeMesh(
+        public static EncodeResult[] EncodeMesh(
             Mesh unityMesh,
             int encodingSpeed = 0,
             int decodingSpeed = 4,
@@ -357,7 +357,7 @@ namespace Draco.Encoder {
         static extern unsafe void dracoEncoderCopy(IntPtr encoder, void *data);
         
         [DllImport (DRACOENC_UNITY_LIB)]
-        static extern unsafe bool dracoEncoderSetIndices(IntPtr encoder, DataType indexComponentType, uint indexCount, IntPtr indices);
+        static extern bool dracoEncoderSetIndices(IntPtr encoder, DataType indexComponentType, uint indexCount, IntPtr indices);
         
         [DllImport (DRACOENC_UNITY_LIB)]
         static extern uint dracoEncoderSetAttribute(IntPtr encoder, int attributeType, DataType dracoDataType, int componentCount, int stride, IntPtr data);
