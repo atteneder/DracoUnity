@@ -24,12 +24,23 @@ using UnityEngine.Rendering;
 
 namespace Draco.Encoder {
 
+    /// <summary>
+    /// Contains encoded data and additional meta information.
+    /// </summary>
     public struct EncodeResult {
+
+        /// <summary>Number of triangle indices</summary>
         public uint indexCount;
+        /// <summary>Number vertices</summary>
         public uint vertexCount;
+        /// <summary>Encoded data</summary>
         public NativeArray<byte> data;
 
-        public void Dispose() {
+        /// <summary>
+        /// Releases allocated resources.
+        /// </summary>
+        public void Dispose()
+        {
             data.Dispose();
         }
     }
