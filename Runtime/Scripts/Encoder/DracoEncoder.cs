@@ -36,7 +36,7 @@ namespace Draco.Encoder {
         /// <summary>Encoded data</summary>
         public NativeArray<byte> data;
         /// <summary>Vertex attribute to Draco property ID mapping</summary>
-        public Dictionary<VertexAttribute,uint> vertexAttributes;
+        public Dictionary<VertexAttribute,(uint identifier,int dimensions)> vertexAttributes;
 
         /// <summary>
         /// Releases allocated resources.
@@ -306,14 +306,14 @@ namespace Draco.Encoder {
                     ? dracoEncoderCreate(mesh.vertexCount)
                     : dracoEncoderCreatePointCloud(mesh.vertexCount);
 
-                var attributeIds = new Dictionary<VertexAttribute, uint>();
+                var attributeIds = new Dictionary<VertexAttribute,(uint identifier,int dimensions)>();
 
                 foreach (var (attribute, attrData) in attributeDataDict) {
                     var format = mesh.GetVertexAttributeFormat(attribute);
                     var dimension = mesh.GetVertexAttributeDimension(attribute);
                     var stride = strides[attrData.stream];
                     var baseAddr = vDataPtr[attrData.stream] + attrData.offset;
-                    attributeIds[attribute] = dracoEncoderSetAttribute(
+                    var id = dracoEncoderSetAttribute(
                         dracoEncoder,
                         (int) GetAttributeType(attribute),
                         GetDataType(format),
@@ -321,6 +321,7 @@ namespace Draco.Encoder {
                         stride,
                         baseAddr
                         );
+                    attributeIds[attribute] = (id, dimension);
                 }
 
                 if (submesh.topology == MeshTopology.Triangles)
