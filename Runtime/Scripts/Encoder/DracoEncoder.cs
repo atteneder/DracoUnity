@@ -35,6 +35,8 @@ namespace Draco.Encoder {
         public uint vertexCount;
         /// <summary>Encoded data</summary>
         public NativeArray<byte> data;
+        /// <summary>Vertex attribute to Draco property ID mapping</summary>
+        public Dictionary<VertexAttribute,uint> vertexAttributes;
 
         /// <summary>
         /// Releases allocated resources.
@@ -42,6 +44,7 @@ namespace Draco.Encoder {
         public void Dispose()
         {
             data.Dispose();
+            vertexAttributes = null;
         }
     }
     
@@ -349,7 +352,8 @@ namespace Draco.Encoder {
                 result[submeshIndex] = new EncodeResult {
                     indexCount = dracoEncoderGetEncodedIndexCount(dracoEncoder),
                     vertexCount = dracoEncoderGetEncodedVertexCount(dracoEncoder),
-                    data = dracoData
+                    data = dracoData,
+                    vertexAttributes = attributeIds
                 };
                 
                 dracoEncoderRelease(dracoEncoder);
