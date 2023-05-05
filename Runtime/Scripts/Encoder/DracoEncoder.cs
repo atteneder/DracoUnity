@@ -27,7 +27,7 @@ namespace Draco.Encoder {
     /// <summary>
     /// Contains encoded data and additional meta information.
     /// </summary>
-    public struct EncodeResult {
+    public struct EncodeResult : IDisposable {
 
         /// <summary>Number of triangle indices</summary>
         public uint indexCount;
