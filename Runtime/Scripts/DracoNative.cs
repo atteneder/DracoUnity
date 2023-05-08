@@ -1106,7 +1106,7 @@ namespace Draco {
             }
         }
 
-        bool ConvertSpace(VertexAttribute attr) {
+        internal static bool ConvertSpace(VertexAttribute attr) {
             switch (attr) {
                 case VertexAttribute.Position:
                 case VertexAttribute.Normal:

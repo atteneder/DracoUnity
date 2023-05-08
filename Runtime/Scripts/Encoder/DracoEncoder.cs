@@ -327,6 +327,7 @@ namespace Draco.Encoder {
                         GetDataType(format),
                         dimension,
                         stride,
+                        DracoNative.ConvertSpace(attribute),
                         baseAddr
                         );
                     attributeIds[attribute] = (id, dimension);
@@ -336,7 +337,13 @@ namespace Draco.Encoder {
                 {
                     var indices = mesh.GetIndices(submeshIndex);
                     var indicesData = PinArray(indices, out var gcHandle);
-                    dracoEncoderSetIndices(dracoEncoder, DataType.DT_UINT32, (uint)indices.Length, indicesData);
+                    dracoEncoderSetIndices(
+                        dracoEncoder,
+                        DataType.DT_UINT32,
+                        (uint)indices.Length,
+                        true,
+                        indicesData
+                        );
                     UnsafeUtility.ReleaseGCObject(gcHandle);
                 }
 
@@ -528,10 +535,23 @@ namespace Draco.Encoder {
         internal static extern unsafe void dracoEncoderCopy(IntPtr encoder, void *data);
         
         [DllImport (DRACOENC_UNITY_LIB)]
-        static extern bool dracoEncoderSetIndices(IntPtr encoder, DataType indexComponentType, uint indexCount, IntPtr indices);
+        static extern bool dracoEncoderSetIndices(
+            IntPtr encoder,
+            DataType indexComponentType,
+            uint indexCount,
+            bool flip,
+            IntPtr indices
+            );
         
         [DllImport (DRACOENC_UNITY_LIB)]
-        static extern uint dracoEncoderSetAttribute(IntPtr encoder, int attributeType, DataType dracoDataType, int componentCount, int stride, IntPtr data);
+        static extern uint dracoEncoderSetAttribute(
+            IntPtr encoder,
+            int attributeType,
+            DataType dracoDataType,
+            int componentCount,
+            int stride,
+            bool flip,
+            IntPtr data);
     }
 
     struct EncodeJob : IJob
