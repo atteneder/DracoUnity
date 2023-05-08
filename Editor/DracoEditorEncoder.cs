@@ -148,7 +148,7 @@ namespace Draco.Editor {
 
                 if (dracoFilesMissing) {
                     var scale = meshFilter.transform.localToWorldMatrix.lossyScale;
-                    var dracoData = DracoEncoder.EncodeMesh(mesh,scale,.0001f);
+                    var dracoData = AsyncHelpers.RunSync(() => DracoEncoder.EncodeMesh(mesh,scale,.0001f));
                     if (dracoData!=null && dracoData.Length > 0) {
                         for (var submesh = 0; submesh < dracoData.Length; submesh++) {
                             if(submesh>0) Debug.LogWarning("more than one submesh. not supported yet.");
@@ -222,7 +222,7 @@ namespace Draco.Editor {
                 Debug.LogError($"Mesh {mesh.name} is not readable!");
                 return;
             }
-            var dracoData = DracoEncoder.EncodeMesh(mesh);
+            var dracoData = AsyncHelpers.RunSync(() => DracoEncoder.EncodeMesh(mesh));
             if (dracoData.Length > 1) {
                 var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-{0}.drc.bytes" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
                 for (var submesh = 0; submesh < dracoData.Length; submesh++) {

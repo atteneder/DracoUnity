@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for efficient self-managed encoding of multiple meshes. Users may use the advanced Mesh API to acquire readable mesh data for multiple meshes at once and pass the data on to new `DracoEncoder.EncodeMesh` overloads that accept said `MeshData`.
 - Vertex attributes information (draco identifier and dimensions) was added to `EncodeResult`
 ### Changed
+- Much faster encoding due to the use of the C# Job System (threads)
+- All encoding methods are async now
 - Updated Burst dependency to version 1.8.4
 ### Fixed
 - Destroying temporary copy (instead of original) GameObject when encoding selected GameObject from the menu
