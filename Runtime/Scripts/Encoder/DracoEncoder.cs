@@ -264,10 +264,12 @@ namespace Draco.Encoder {
         )
         {
 #if UNITY_2020_1_OR_NEWER
+#if !UNITY_EDITOR
             if (!mesh.isReadable) {
                 Debug.LogError("Mesh is not readable");
                 return null;
             }
+#endif
             Profiler.BeginSample("EncodeMesh.Prepare");
             
             var result = new EncodeResult[meshData.subMeshCount];
