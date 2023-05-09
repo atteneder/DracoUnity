@@ -30,7 +30,7 @@ namespace Draco.Encoder {
     /// <summary>
     /// Contains encoded data and additional meta information.
     /// </summary>
-    public struct EncodeResult : IDisposable {
+    public unsafe struct EncodeResult : IDisposable {
 
         /// <summary>Number of triangle indices</summary>
         public uint indexCount;
@@ -41,13 +41,43 @@ namespace Draco.Encoder {
         /// <summary>Vertex attribute to Draco property ID mapping</summary>
         public Dictionary<VertexAttribute,(uint identifier,int dimensions)> vertexAttributes;
 
+        IntPtr m_DracoEncoder;
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        AtomicSafetyHandle m_SafetyHandle;
+#endif
+
+        public EncodeResult(
+            IntPtr dracoEncoder,
+            uint indexCount,
+            uint vertexCount,
+            Dictionary<VertexAttribute,(uint identifier,int dimensions)> vertexAttributes
+            )
+        {
+            m_DracoEncoder = dracoEncoder;
+            this.indexCount = indexCount;
+            this.vertexCount = vertexCount;
+            DracoEncoder.dracoEncoderGetEncodeBuffer(m_DracoEncoder, out var dracoData, out var size);
+            data = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>(dracoData, (int)size, Allocator.None);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            m_SafetyHandle = AtomicSafetyHandle.Create();
+            NativeArrayUnsafeUtility.SetAtomicSafetyHandle(array: ref data, m_SafetyHandle);
+#endif
+            this.vertexAttributes = vertexAttributes;
+        }
+        
         /// <summary>
         /// Releases allocated resources.
         /// </summary>
         public void Dispose()
         {
-            data.Dispose();
             vertexAttributes = null;
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            AtomicSafetyHandle.Release(m_SafetyHandle);
+#endif
+            if(m_DracoEncoder!=IntPtr.Zero)
+                DracoEncoder.dracoEncoderRelease(m_DracoEncoder);
+            m_DracoEncoder = IntPtr.Zero;
         }
     }
     
@@ -373,19 +403,14 @@ namespace Draco.Encoder {
                 jobHandle.Complete();
                 
                 Profiler.BeginSample("EncodeMesh.Submesh.Aftermath");
-                var dracoDataSize = (int) dracoEncoderGetByteLength(dracoEncoder);
-                
-                var dracoData = new NativeArray<byte>(dracoDataSize, Allocator.Persistent);
-                CopyResult(dracoEncoder, dracoData);
 
-                result[submeshIndex] = new EncodeResult {
-                    indexCount = dracoEncoderGetEncodedIndexCount(dracoEncoder),
-                    vertexCount = dracoEncoderGetEncodedVertexCount(dracoEncoder),
-                    data = dracoData,
-                    vertexAttributes = attributeIds
-                };
+                result[submeshIndex] = new EncodeResult (
+                    dracoEncoder,
+                    dracoEncoderGetEncodedIndexCount(dracoEncoder),
+                    dracoEncoderGetEncodedVertexCount(dracoEncoder),
+                    attributeIds
+                );
                 
-                dracoEncoderRelease(dracoEncoder);
                 Profiler.EndSample(); // EncodeMesh.Submesh.Aftermath
             }
             
@@ -511,7 +536,7 @@ namespace Draco.Encoder {
         static extern IntPtr dracoEncoderCreatePointCloud(int vertexCount);
 
         [DllImport (DRACOENC_UNITY_LIB)]
-        static extern void dracoEncoderRelease(IntPtr encoder);
+        internal static extern void dracoEncoderRelease(IntPtr encoder);
         
         [DllImport (DRACOENC_UNITY_LIB)]
         static extern void dracoEncoderSetCompressionSpeed(IntPtr encoder, int encodingSpeed, int decodingSpeed);
@@ -533,6 +558,10 @@ namespace Draco.Encoder {
         
         [DllImport (DRACOENC_UNITY_LIB)]
         internal static extern unsafe void dracoEncoderCopy(IntPtr encoder, void *data);
+        
+        [DllImport (DRACOENC_UNITY_LIB)]
+        internal static extern unsafe void dracoEncoderGetEncodeBuffer(IntPtr encoder, out void *data, out ulong size);
+
         
         [DllImport (DRACOENC_UNITY_LIB)]
         static extern bool dracoEncoderSetIndices(
