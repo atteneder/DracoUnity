@@ -30,20 +30,20 @@ namespace Draco.Editor {
         struct DracoMesh {
             public MeshFilter target;
             public TextAsset[] dracoAssets;
-            public string[] submeshFilenames;
-            string[] submeshAssetPaths;
+            string[] m_SubmeshAssetPaths;
 
             public DracoMesh(MeshFilter target, string directory) {
                 this.target = target;
                 var mesh = target.sharedMesh;
                 dracoAssets = new TextAsset[mesh.subMeshCount];
-                submeshFilenames = new string[mesh.subMeshCount];
-                submeshAssetPaths = new string[mesh.subMeshCount];
+                var submeshFilenames
+                    = new string[mesh.subMeshCount];
+                m_SubmeshAssetPaths = new string[mesh.subMeshCount];
                 
                 var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-0.drc" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++) {
                     submeshFilenames[submesh] = string.Format(filename, submesh);
-                    submeshAssetPaths[submesh] = Path.Combine(directory, submeshFilenames[submesh]);
+                    m_SubmeshAssetPaths[submesh] = Path.Combine(directory, submeshFilenames[submesh]);
                 }
             }
             
@@ -53,7 +53,7 @@ namespace Draco.Editor {
                 var mesh = target.sharedMesh;
                 for (int submesh = 0; submesh < mesh.subMeshCount; submesh++) {
                     if(dracoAssets[submesh]!=null) continue;
-                    dracoAssets[submesh] = AssetDatabase.LoadAssetAtPath<TextAsset>(submeshAssetPaths[submesh]);
+                    dracoAssets[submesh] = AssetDatabase.LoadAssetAtPath<TextAsset>(m_SubmeshAssetPaths[submesh]);
                     if (dracoAssets[submesh] == null) {
                         return false;
                     }
@@ -62,8 +62,10 @@ namespace Draco.Editor {
             }
 
             public string GetSubmeshAssetPath(int submeshIndex) {
-                var projectPath = Directory.GetParent(Application.dataPath); 
-                return Path.Combine(projectPath.FullName, submeshAssetPaths[submeshIndex]);
+                var projectPath = Directory.GetParent(Application.dataPath);
+                if (projectPath == null)
+                    return null;
+                return Path.Combine(projectPath.FullName, m_SubmeshAssetPaths[submeshIndex]);
             }
         }
 
@@ -94,8 +96,8 @@ namespace Draco.Editor {
         public static void CompressSceneMenu() {
             CompressScene( SceneManager.GetActiveScene() );
         }
-        
-        public static void CompressScene( Scene scene ) {
+
+        static void CompressScene( Scene scene ) {
 
             var scenePath = scene.path;
             var sceneDir = scenePath.Substring(0, scenePath.Length - 6);

@@ -34,42 +34,42 @@ namespace Draco {
     // These values must be exactly the same as the values in draco_types.h.
     // Attribute data type.
     enum DataType {
-        DT_INVALID = 0,
-        DT_INT8,
-        DT_UINT8,
-        DT_INT16,
-        DT_UINT16,
-        DT_INT32,
-        DT_UINT32,
-        DT_INT64,
-        DT_UINT64,
-        DT_FLOAT32,
-        DT_FLOAT64,
-        DT_BOOL
+        Invalid = 0, // DT_INVALID
+        Int8, // DT_INT8
+        UInt8, // DT_UINT8
+        Int16, // DT_INT16
+        UInt16, // DT_UINT16
+        Int32, // DT_INT32
+        UInt32, // DT_UINT32
+        Int64, // DT_INT64
+        UInt64, // DT_UINT64
+        Float32, // DT_FLOAT32
+        Float64, // DT_FLOAT64
+        Bool // DT_BOOL
     }
 
     // These values must be exactly the same as the values in
     // geometry_attribute.h.
     // Attribute type.
     enum AttributeType {
-        INVALID = -1,
-        POSITION = 0,
-        NORMAL,
-        COLOR,
-        TEX_COORD,
+        Invalid = -1, // INVALID
+        Position = 0, // POSITION
+        Normal, // NORMAL
+        Color, // COLOR
+        TextureCoordinate, // TEX_COORD
         // A special id used to mark attributes that are not assigned to any known
         // predefined use case. Such attributes are often used for a shader specific
         // data.
-        GENERIC
+        Generic // GENERIC
     }
     
     [BurstCompile]
-    unsafe internal class DracoNative {
+    unsafe class DracoNative {
         
 #if !UNITY_EDITOR && (UNITY_WEBGL || UNITY_IOS)
-        const string DRACODEC_UNITY_LIB = "__Internal";
+        const string k_DracoDecUnityLib = "__Internal";
 #elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR || PLATFORM_LUMIN
-        const string DRACODEC_UNITY_LIB = "dracodec_unity";
+        const string k_DracoDecUnityLib = "dracodec_unity";
 #endif
         
         public const int maxStreamCount = 4;
@@ -78,57 +78,57 @@ namespace Draco {
         /// If Draco mesh has more vertices than this value, memory is allocated persistent,
         /// which is slower, but safe when spanning multiple frames.
         /// </summary>
-        const int persistentDataThreshold = 5_000;
+        const int k_PersistentDataThreshold = 5_000;
         
-        const int meshPtrIndex = 0;
-        const int decoderPtrIndex = 1;
-        const int bufferPtrIndex = 2;
+        const int k_MeshPtrIndex = 0;
+        const int k_DecoderPtrIndex = 1;
+        const int k_BufferPtrIndex = 2;
 
         // Cached function pointers
-        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueInt8Method;
-        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueUInt8Method;
-        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueInt16Method;
-        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueUInt16Method;
-        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueInt32Method;
-        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueUInt32Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> s_GetIndexValueInt8Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> s_GetIndexValueUInt8Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> s_GetIndexValueInt16Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> s_GetIndexValueUInt16Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> s_GetIndexValueInt32Method;
+        static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> s_GetIndexValueUInt32Method;
         
         /// <summary>
         /// If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).
         /// </summary>
-        bool convertSpace;
+        bool m_ConvertSpace;
 
-        List<AttributeMapBase> attributes;
-        int[] streamStrides;
-        int[] streamMemberCount;
+        List<AttributeMapBase> m_Attributes;
+        int[] m_StreamStrides;
+        int[] m_StreamMemberCount;
 
-        Allocator allocator;
-        NativeArray<int> dracoDecodeResult;
-        NativeArray<IntPtr> dracoTempResources;
+        Allocator m_Allocator;
+        NativeArray<int> m_DracoDecodeResult;
+        NativeArray<IntPtr> m_DracoTempResources;
 
-        bool isPointCloud;
+        bool m_IsPointCloud;
 
-        Mesh.MeshData mesh;
-        int indicesCount;
+        Mesh.MeshData m_Mesh;
+        int m_IndicesCount;
         
-#region BlendHack
-        // TODO: BLENDHACK; Unity does not support setting bone weights and indices via new Mesh API
+        // START BLEND-HACK
+        // TODO: Unity does not support setting bone weights and indices via new Mesh API
         // https://fogbugz.unity3d.com/default.asp?1320869_7g7qeq40va98n6h6
         // As a workaround we extract those attributes separately so they can be fed into
         // Mesh.SetBoneWeights after the Mesh was created.
-        AttributeMap boneIndexMap;
-        AttributeMap boneWeightMap;
-        public bool hasBoneWeightData => boneIndexMap!=null && boneWeightMap!=null;
+        AttributeMap m_BoneIndexMap;
+        AttributeMap m_BoneWeightMap;
+        public bool hasBoneWeightData => m_BoneIndexMap!=null && m_BoneWeightMap!=null;
         public NativeArray<byte> bonesPerVertex;
         public NativeArray<BoneWeight1> boneWeights;
-#endregion BlendHack
+        // END BLEND-HACK
 
         public DracoNative(
             Mesh.MeshData mesh,
             bool convertSpace = true
             )
         {
-            this.convertSpace = convertSpace;
-            this.mesh = mesh;
+            this.m_ConvertSpace = convertSpace;
+            this.m_Mesh = mesh;
         }
 
         public JobHandle Init(IntPtr encodedData, int size) {
@@ -144,19 +144,19 @@ namespace Draco {
 #endif
 
         DecodeJob CreateDecodeJob(IntPtr encodedData, int size) {
-            dracoDecodeResult = new NativeArray<int>(1, Allocator.Persistent);
-            dracoTempResources = new NativeArray<IntPtr>(3, Allocator.Persistent);
+            m_DracoDecodeResult = new NativeArray<int>(1, Allocator.Persistent);
+            m_DracoTempResources = new NativeArray<IntPtr>(3, Allocator.Persistent);
             var decodeJob = new DecodeJob() {
                 encodedData = (byte*)encodedData,
                 size = size,
-                result = dracoDecodeResult,
-                dracoTempResources = dracoTempResources
+                result = m_DracoDecodeResult,
+                dracoTempResources = m_DracoTempResources
             };
             return decodeJob;
         }
 
         public bool ErrorOccured() {
-            return dracoDecodeResult[0] < 0;
+            return m_DracoDecodeResult[0] < 0;
         }
         
         void CalculateVertexParams(
@@ -170,7 +170,7 @@ namespace Draco {
             )
         {
             Profiler.BeginSample("CalculateVertexParams");
-            attributes = new List<AttributeMapBase>();
+            m_Attributes = new List<AttributeMapBase>();
             var attributeTypes = new HashSet<VertexAttribute>();
             
             bool CreateAttributeMaps(AttributeType attributeType, int count, DracoMesh* draco, bool normalized = false) {
@@ -202,9 +202,9 @@ namespace Draco {
                             attribute,
                             type.Value,
                             format.Value,
-                            convertSpace && ConvertSpace(type.Value)
+                            m_ConvertSpace && ConvertSpace(type.Value)
                             );
-                        attributes.Add(map);
+                        m_Attributes.Add(map);
                         attributeTypes.Add(type.Value);
                         foundAttribute = true;
                     }
@@ -231,7 +231,7 @@ namespace Draco {
                     var format = GetVertexAttributeFormat((DataType)attribute->dataType, normalized);
                     if (!format.HasValue) { return false; }
 
-                    map = new AttributeMap(attribute, type, format.Value, convertSpace && ConvertSpace(type));
+                    map = new AttributeMap(attribute, type, format.Value, m_ConvertSpace && ConvertSpace(type));
                     attributeTypes.Add(type);
                     return true;
                 }
@@ -241,38 +241,38 @@ namespace Draco {
             // Vertex attributes are added in the order defined here:
             // https://docs.unity3d.com/2020.1/Documentation/ScriptReference/Rendering.VertexAttributeDescriptor.html
             //
-            CreateAttributeMaps(AttributeType.POSITION, 1, dracoMesh);
-            var hasNormals = CreateAttributeMaps(AttributeType.NORMAL, 1, dracoMesh, true);
+            CreateAttributeMaps(AttributeType.Position, 1, dracoMesh);
+            var hasNormals = CreateAttributeMaps(AttributeType.Normal, 1, dracoMesh, true);
             calculateNormals = !hasNormals && requireNormals;
             if (calculateNormals) {
                 calculateNormals = true;
-                attributes.Add(new CalculatedAttributeMap(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, 4 ));
+                m_Attributes.Add(new CalculatedAttributeMap(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, 4 ));
             }
             if (requireTangents) {
-                attributes.Add(new CalculatedAttributeMap(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 4 ));
+                m_Attributes.Add(new CalculatedAttributeMap(VertexAttribute.Tangent, VertexAttributeFormat.Float32, 4, 4 ));
             }
-            var hasTexCoordOrColor = CreateAttributeMaps(AttributeType.COLOR, 1, dracoMesh, true);
-            hasTexCoordOrColor |= CreateAttributeMaps(AttributeType.TEX_COORD, 8, dracoMesh, true);
+            var hasTexCoordOrColor = CreateAttributeMaps(AttributeType.Color, 1, dracoMesh, true);
+            hasTexCoordOrColor |= CreateAttributeMaps(AttributeType.TextureCoordinate, 8, dracoMesh, true);
 
             var hasSkinning = false;
             if (weightsAttributeId >= 0) {
                 if (CreateAttributeMapById(VertexAttribute.BlendWeight, weightsAttributeId, dracoMesh, out var map, true)) {
-                    // BLENDHACK: Don't add bone weights, as they won't exist after Mesh.SetBoneWeights
+                    // BLEND-HACK: Don't add bone weights, as they won't exist after Mesh.SetBoneWeights
                     // attributes.Add(map);
-                    boneWeightMap = map;
+                    m_BoneWeightMap = map;
                     hasSkinning = true;
                 }
             }
             if (jointsAttributeId >= 0) {
                 if (CreateAttributeMapById(VertexAttribute.BlendIndices, jointsAttributeId, dracoMesh, out var map)) {
-                    attributes.Add(map);
-                    boneIndexMap = map;
+                    m_Attributes.Add(map);
+                    m_BoneIndexMap = map;
                     hasSkinning = true;
                 }
             }
             
-            streamStrides = new int[maxStreamCount];
-            streamMemberCount = new int[maxStreamCount];
+            m_StreamStrides = new int[maxStreamCount];
+            m_StreamMemberCount = new int[maxStreamCount];
             var streamIndex = 0;
             
             // skinning requires SkinnedMeshRenderer layout
@@ -285,7 +285,7 @@ namespace Draco {
             // See: https://github.com/atteneder/glTFast/issues/197
             forceUnityLayout |= dracoMesh->numVertices <= ushort.MaxValue;
 
-            foreach (var attributeMap in attributes) {
+            foreach (var attributeMap in m_Attributes) {
                 // Stream assignment:
                 // Positions get a dedicated stream (0)
                 // The rest lands on stream 1
@@ -326,12 +326,12 @@ namespace Draco {
                         break;
                 }
                 var elementSize = attributeMap.elementSize;
-                attributeMap.offset = streamStrides[streamIndex];
+                attributeMap.offset = m_StreamStrides[streamIndex];
                 attributeMap.stream = streamIndex;
-                streamStrides[streamIndex] += elementSize;
-                streamMemberCount[streamIndex]++;
+                m_StreamStrides[streamIndex] += elementSize;
+                m_StreamMemberCount[streamIndex]++;
             }
-            attributes.Sort();
+            m_Attributes.Sort();
             Profiler.EndSample(); // CalculateVertexParams
         }
 
@@ -348,8 +348,8 @@ namespace Draco {
             )
         {
             var decodeVerticesJob = new DecodeVerticesJob() {
-                result = dracoDecodeResult,
-                dracoTempResources = dracoTempResources
+                result = m_DracoDecodeResult,
+                dracoTempResources = m_DracoTempResources
             };
             var decodeVerticesJobHandle = decodeVerticesJob.Schedule();
 #if UNITY_EDITOR
@@ -359,17 +359,17 @@ namespace Draco {
 #endif
             
             var indicesJob = new GetDracoIndicesJob() {
-                result = dracoDecodeResult,
-                dracoTempResources = dracoTempResources,
-                flip = convertSpace,
-                dataType = mesh.indexFormat == IndexFormat.UInt16 ? DataType.DT_UINT16 : DataType.DT_UINT32, 
-                mesh = mesh
+                result = m_DracoDecodeResult,
+                dracoTempResources = m_DracoTempResources,
+                flip = m_ConvertSpace,
+                dataType = m_Mesh.indexFormat == IndexFormat.UInt16 ? DataType.UInt16 : DataType.UInt32, 
+                mesh = m_Mesh
             };
-            var jobCount = attributes.Count + 1;
+            var jobCount = m_Attributes.Count + 1;
             
             if (hasBoneWeightData) jobCount++;
 
-            var jobHandles = new NativeArray<JobHandle>(jobCount, allocator) {
+            var jobHandles = new NativeArray<JobHandle>(jobCount, m_Allocator) {
                 [0] = indicesJob.Schedule(decodeVerticesJobHandle)
             };
 
@@ -380,23 +380,23 @@ namespace Draco {
 #endif
             
             int jobIndex = 1;
-            foreach (var mapBase in attributes) {
+            foreach (var mapBase in m_Attributes) {
                 var map = mapBase as AttributeMap;
                 if(map == null) continue;
                 
-                // BLENDHACK: skip blend indices here (done below)
+                // BLEND-HACK: skip blend indices here (done below)
                 // weights were removed from attributes before
                 if(map.attribute == VertexAttribute.BlendIndices) continue; // Blend
                 
-                if (streamMemberCount[map.stream] > 1) {
+                if (m_StreamMemberCount[map.stream] > 1) {
                     var job = new GetDracoDataInterleavedJob() {
-                        result = dracoDecodeResult,
-                        dracoTempResources = dracoTempResources,
+                        result = m_DracoDecodeResult,
+                        dracoTempResources = m_DracoTempResources,
                         attribute = map.dracoAttribute,
-                        stride = streamStrides[map.stream],
+                        stride = m_StreamStrides[map.stream],
                         flip = map.convertSpace,
                         componentStride = map.numComponents,
-                        mesh = mesh, 
+                        mesh = m_Mesh, 
                         streamIndex = map.stream, 
                         offset = map.offset
                     };
@@ -404,12 +404,12 @@ namespace Draco {
                 }
                 else {
                     var job = new GetDracoDataJob() {
-                        result = dracoDecodeResult,
-                        dracoTempResources = dracoTempResources,
+                        result = m_DracoDecodeResult,
+                        dracoTempResources = m_DracoTempResources,
                         attribute = map.dracoAttribute,
                         flip = map.convertSpace,
                         componentStride = map.numComponents,
-                        mesh = mesh, 
+                        mesh = m_Mesh, 
                         streamIndex = map.stream
                     };
                     jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
@@ -423,15 +423,15 @@ namespace Draco {
             }
 
             if (hasBoneWeightData) {
-                // TODO: BLENDHACK;
+                // TODO: BLEND-HACK;
                 var job = new GetDracoBonesJob() {
-                    result = dracoDecodeResult,
-                    dracoTempResources = dracoTempResources,
-                    indicesAttribute = boneIndexMap.dracoAttribute,
-                    weightsAttribute = boneWeightMap.dracoAttribute,
+                    result = m_DracoDecodeResult,
+                    dracoTempResources = m_DracoTempResources,
+                    indicesAttribute = m_BoneIndexMap.dracoAttribute,
+                    weightsAttribute = m_BoneWeightMap.dracoAttribute,
                     bonesPerVertex = bonesPerVertex,
                     boneWeights = boneWeights,
-                    indexValueConverter = GetIndexValueConverter(boneIndexMap.format)
+                    indexValueConverter = GetIndexValueConverter(m_BoneIndexMap.format)
                 };
                 jobHandles[jobIndex] = job.Schedule(decodeVerticesJobHandle);
             }
@@ -440,16 +440,16 @@ namespace Draco {
             jobHandles.Dispose();
 
             var releaseDracoMeshJob = new ReleaseDracoMeshJob {
-                dracoTempResources = dracoTempResources
+                dracoTempResources = m_DracoTempResources
             };
-            var releaseDreacoMeshJobHandle = releaseDracoMeshJob.Schedule(jobHandle);
+            var releaseDracoMeshJobHandle = releaseDracoMeshJob.Schedule(jobHandle);
 
 #if UNITY_EDITOR
             if (sync) {
-                releaseDreacoMeshJobHandle.Complete();
+                releaseDracoMeshJobHandle.Complete();
             }
 #endif
-            return releaseDreacoMeshJobHandle;
+            return releaseDracoMeshJobHandle;
         }
 
         internal void CreateMesh(
@@ -463,8 +463,8 @@ namespace Draco {
         {
             Profiler.BeginSample("CreateMesh");
             
-            var dracoMesh = (DracoMesh*)dracoTempResources[meshPtrIndex];
-            allocator = dracoMesh->numVertices > persistentDataThreshold ? Allocator.Persistent : Allocator.TempJob;
+            var dracoMesh = (DracoMesh*)m_DracoTempResources[k_MeshPtrIndex];
+            m_Allocator = dracoMesh->numVertices > k_PersistentDataThreshold ? Allocator.Persistent : Allocator.TempJob;
             
             CalculateVertexParams(
                 dracoMesh,
@@ -477,18 +477,18 @@ namespace Draco {
                 );
             
             Profiler.BeginSample("SetParameters");
-            isPointCloud = dracoMesh->isPointCloud;
-            indicesCount = dracoMesh->numFaces * 3;
-            if (!isPointCloud) {
-                mesh.SetIndexBufferParams(dracoMesh->numFaces*3, dracoMesh->indexFormat);
+            m_IsPointCloud = dracoMesh->isPointCloud;
+            m_IndicesCount = dracoMesh->numFaces * 3;
+            if (!m_IsPointCloud) {
+                m_Mesh.SetIndexBufferParams(dracoMesh->numFaces*3, dracoMesh->indexFormat);
             }
-            var vertexParams = new List<VertexAttributeDescriptor>(attributes.Count);
-            foreach (var map in attributes) {
+            var vertexParams = new List<VertexAttributeDescriptor>(m_Attributes.Count);
+            foreach (var map in m_Attributes) {
                 vertexParams.Add(map.GetVertexAttributeDescriptor());
             }
-            mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
+            m_Mesh.SetVertexBufferParams(dracoMesh->numVertices, vertexParams.ToArray());
             if (hasBoneWeightData) {
-                var boneCount = boneIndexMap.numComponents;
+                var boneCount = m_BoneIndexMap.numComponents;
                 bonesPerVertex = new NativeArray<byte>(dracoMesh->numVertices, Allocator.Persistent);
                 boneWeights = new NativeArray<BoneWeight1>(dracoMesh->numVertices * boneCount, Allocator.Persistent);
             }
@@ -497,8 +497,8 @@ namespace Draco {
         }
 
         public void DisposeDracoMesh() {
-            dracoDecodeResult.Dispose();
-            dracoTempResources.Dispose();
+            m_DracoDecodeResult.Dispose();
+            m_DracoTempResources.Dispose();
         }
 
         public bool 
@@ -506,18 +506,18 @@ namespace Draco {
             
             Profiler.BeginSample("PopulateMeshData");
             
-            foreach (var map in attributes) {
+            foreach (var map in m_Attributes) {
                 map.Dispose();
             }
-            attributes = null;
+            m_Attributes = null;
 
             Profiler.BeginSample("MeshAssign");
 
             const MeshUpdateFlags flags = DracoMeshLoader.defaultMeshUpdateFlags;
             
-            mesh.subMeshCount = 1;
-            var submeshDescriptor = new SubMeshDescriptor(0, indicesCount, isPointCloud ? MeshTopology.Points : MeshTopology.Triangles) { firstVertex = 0, baseVertex = 0, vertexCount = mesh.vertexCount };
-            mesh.SetSubMesh(0, submeshDescriptor, flags);
+            m_Mesh.subMeshCount = 1;
+            var submeshDescriptor = new SubMeshDescriptor(0, m_IndicesCount, m_IsPointCloud ? MeshTopology.Points : MeshTopology.Triangles) { firstVertex = 0, baseVertex = 0, vertexCount = m_Mesh.vertexCount };
+            m_Mesh.SetSubMesh(0, submeshDescriptor, flags);
             Profiler.EndSample(); // CreateUnityMesh.CreateMesh
             Profiler.EndSample();
             
@@ -525,8 +525,8 @@ namespace Draco {
         }
 
         public void DisposeBoneWeightData() {
-            boneIndexMap = null;
-            boneWeightMap = null;
+            m_BoneIndexMap = null;
+            m_BoneWeightMap = null;
         }
 
         /// <summary>
@@ -539,59 +539,65 @@ namespace Draco {
         static FunctionPointer<GetDracoBonesJob.GetIndexValueDelegate> GetIndexValueConverter(VertexAttributeFormat format) {
             switch (format) {
                 case VertexAttributeFormat.UInt8:
-                    if (!GetIndexValueUInt8Method.IsCreated) {
-                        GetIndexValueUInt8Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt8);
+                    if (!s_GetIndexValueUInt8Method.IsCreated) {
+                        s_GetIndexValueUInt8Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt8);
                     }
-                    return GetIndexValueUInt8Method;
+                    return s_GetIndexValueUInt8Method;
                 case VertexAttributeFormat.SInt8:
-                    if (!GetIndexValueInt8Method.IsCreated) {
-                        GetIndexValueInt8Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt8);
+                    if (!s_GetIndexValueInt8Method.IsCreated) {
+                        s_GetIndexValueInt8Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt8);
                     }
-                    return GetIndexValueInt8Method;
+                    return s_GetIndexValueInt8Method;
                 case VertexAttributeFormat.UInt16:
-                    if (!GetIndexValueUInt16Method.IsCreated) {
-                        GetIndexValueUInt16Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt16);
+                    if (!s_GetIndexValueUInt16Method.IsCreated) {
+                        s_GetIndexValueUInt16Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt16);
                     }
-                    return GetIndexValueUInt16Method;
+                    return s_GetIndexValueUInt16Method;
                 case VertexAttributeFormat.SInt16:
-                    if (!GetIndexValueInt16Method.IsCreated) {
-                        GetIndexValueInt16Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt16);
+                    if (!s_GetIndexValueInt16Method.IsCreated) {
+                        s_GetIndexValueInt16Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt16);
                     }
-                    return GetIndexValueInt16Method;
+                    return s_GetIndexValueInt16Method;
                 case VertexAttributeFormat.UInt32:
-                    if (!GetIndexValueUInt32Method.IsCreated) {
-                        GetIndexValueUInt32Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt32);
+                    if (!s_GetIndexValueUInt32Method.IsCreated) {
+                        s_GetIndexValueUInt32Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueUInt32);
                     }
-                    return GetIndexValueUInt32Method;
+                    return s_GetIndexValueUInt32Method;
                 case VertexAttributeFormat.SInt32:
-                    if (!GetIndexValueInt32Method.IsCreated) {
-                        GetIndexValueInt32Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt32);
+                    if (!s_GetIndexValueInt32Method.IsCreated) {
+                        s_GetIndexValueInt32Method = BurstCompiler.CompileFunctionPointer<GetDracoBonesJob.GetIndexValueDelegate>(GetDracoBonesJob.GetIndexValueInt32);
                     }
-                    return GetIndexValueInt32Method;
+                    return s_GetIndexValueInt32Method;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(format), format, null);
             }
         }
 
         // The order must be consistent with C++ interface.
-        [StructLayout (LayoutKind.Sequential)] public struct DracoData
+        [StructLayout (LayoutKind.Sequential)]
+        struct DracoData
         {
             public int dataType;
             public IntPtr data;
         }
 
-        [StructLayout (LayoutKind.Sequential)] public struct DracoAttribute
+        [StructLayout (LayoutKind.Sequential)]
+        struct DracoAttribute
         {
+            // ReSharper disable MemberCanBePrivate.Local
             public int attributeType;
             public int dataType;
             public int numComponents;
             public int uniqueId;
+            // ReSharper restore MemberCanBePrivate.Local
         }
 
-        [StructLayout (LayoutKind.Sequential)] public struct DracoMesh
+        [StructLayout (LayoutKind.Sequential)]
+        struct DracoMesh
         {
             public int numFaces;
             public int numVertices;
+            // ReSharper disable once MemberCanBePrivate.Local
             public int numAttributes;
             public bool isPointCloud;
 
@@ -599,41 +605,51 @@ namespace Draco {
         }
 
         // Release data associated with DracoMesh.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern void ReleaseDracoMesh(
+        [DllImport (k_DracoDecUnityLib)]
+        static extern void ReleaseDracoMesh(
             DracoMesh**mesh);
         // Release data associated with DracoAttribute.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern void
+        [DllImport (k_DracoDecUnityLib)]
+        static extern void
             ReleaseDracoAttribute(DracoAttribute**attr);
         // Release attribute data.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern void ReleaseDracoData(
+        [DllImport (k_DracoDecUnityLib)]
+        static extern void ReleaseDracoData(
             DracoData**data);
 
         // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
         // must be null. The returned mesh must released with ReleaseDracoMesh.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern int DecodeDracoMeshStep1(
+        [DllImport (k_DracoDecUnityLib)]
+        static extern int DecodeDracoMeshStep1(
             byte* buffer, int length, DracoMesh**mesh, void**decoder, void** decoderBuffer);
         
         // Decodes compressed Draco::Mesh in buffer to mesh. On input, mesh
         // must be null. The returned mesh must released with ReleaseDracoMesh.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern int DecodeDracoMeshStep2(
+        [DllImport (k_DracoDecUnityLib)]
+        static extern int DecodeDracoMeshStep2(
             DracoMesh**mesh, void* decoder, void* decoderBuffer);
         
         // Returns the DracoAttribute at index in mesh. On input, attribute must be
         // null. The returned attr must be released with ReleaseDracoAttribute.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttribute(
-            DracoMesh* mesh, int index, DracoAttribute**attr);
+        // Unused currently, thus commented.
+        // [DllImport (k_DracoDecUnityLib)]
+        // static extern bool GetAttribute(
+        //     DracoMesh* mesh, int index, DracoAttribute**attr);
+
         // Returns the DracoAttribute of type at index in mesh. On input, attribute
         // must be null. E.g. If the mesh has two texture coordinates then
         // GetAttributeByType(mesh, AttributeType.TEX_COORD, 1, &attr); will return
         // the second TEX_COORD attribute. The returned attr must be released with
         // ReleaseDracoAttribute.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttributeByType(
+        [DllImport (k_DracoDecUnityLib)]
+        static extern bool GetAttributeByType(
             DracoMesh* mesh, AttributeType type, int index, DracoAttribute**attr);
         // Returns the DracoAttribute with unique_id in mesh. On input, attribute
         // must be null.The returned attr must be released with
         // ReleaseDracoAttribute.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool
-            GetAttributeByUniqueId(DracoMesh* mesh, int unique_id,
+        [DllImport (k_DracoDecUnityLib)]
+        static extern bool
+            GetAttributeByUniqueId(DracoMesh* mesh, int uniqueID,
                 DracoAttribute**attr);
         
         /// <summary>
@@ -647,7 +663,7 @@ namespace Draco {
         /// <param name="indicesCount">Number of indices (equals triangle count * 3)</param>
         /// <param name="flip">If true, triangle vertex order is reverted</param>
         /// <returns>True if extraction succeeded, false otherwise</returns>
-        [DllImport (DRACODEC_UNITY_LIB)] static extern bool GetMeshIndices(
+        [DllImport (k_DracoDecUnityLib)] static extern bool GetMeshIndices(
             DracoMesh* mesh,
             DataType dataType,
             void* indices,
@@ -658,17 +674,18 @@ namespace Draco {
         // Returns an array of attribute data as well as the type of data in
         // data_type. On input, data must be null. The returned data must be
         // released with ReleaseDracoData.
-        [DllImport (DRACODEC_UNITY_LIB)] unsafe static extern bool GetAttributeData(
-            DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip, int component_stride);
+        [DllImport (k_DracoDecUnityLib)]
+        static extern bool GetAttributeData(
+            DracoMesh* mesh, DracoAttribute* attr, DracoData**data, bool flip, int componentStride);
 
         abstract class AttributeMapBase : IComparable<AttributeMapBase> {
-            readonly public VertexAttribute attribute;
+            public readonly VertexAttribute attribute;
             public VertexAttributeFormat format;
             public int offset;
             public int stream;
             public bool flip;
-        
-            public AttributeMapBase (VertexAttribute attribute, VertexAttributeFormat format) {
+
+            protected AttributeMapBase (VertexAttribute attribute, VertexAttributeFormat format) {
                 this.attribute = attribute;
                 this.format = format;
                 offset = 0;
@@ -693,7 +710,7 @@ namespace Draco {
         
         class AttributeMap : AttributeMapBase {
             public DracoAttribute* dracoAttribute;
-            public bool convertSpace = false;
+            public bool convertSpace;
 
             public AttributeMap (DracoAttribute* dracoAttribute, VertexAttribute attribute, VertexAttributeFormat format, bool convertSpace) : base(attribute,format) {
                 this.dracoAttribute = dracoAttribute;
@@ -724,13 +741,7 @@ namespace Draco {
                 }
             }
 
-            public override int elementSize
-            {
-                get
-                {
-                    return numComponents * DataTypeSize((DataType)dracoAttribute->dataType);
-                }
-            }
+            public override int elementSize => numComponents * DataTypeSize((DataType)dracoAttribute->dataType);
 
             public override void Dispose() {
                 var tmp = dracoAttribute;
@@ -740,16 +751,16 @@ namespace Draco {
         }
 
         class CalculatedAttributeMap : AttributeMapBase {
-            public int m_numComponents;
-            public int m_elementSize;
+            int m_NumComponents;
+            int m_ElementSize;
             
             public CalculatedAttributeMap (VertexAttribute attribute, VertexAttributeFormat format, int numComponents, int componentSize) : base(attribute,format) {
-                m_numComponents = numComponents;
-                m_elementSize = componentSize * numComponents;
+                m_NumComponents = numComponents;
+                m_ElementSize = componentSize * numComponents;
             }
 
-            public override int numComponents => m_numComponents;
-            public override int elementSize => m_elementSize;
+            public override int numComponents => m_NumComponents;
+            public override int elementSize => m_ElementSize;
         }
 
         [BurstCompile]
@@ -775,9 +786,9 @@ namespace Draco {
                 if (decodeResult < 0) {
                     return;
                 }
-                dracoTempResources[meshPtrIndex] = (IntPtr) dracoMeshPtr;
-                dracoTempResources[decoderPtrIndex] = (IntPtr) decoder;
-                dracoTempResources[bufferPtrIndex] = (IntPtr) buffer;
+                dracoTempResources[k_MeshPtrIndex] = (IntPtr) dracoMeshPtr;
+                dracoTempResources[k_DecoderPtrIndex] = (IntPtr) decoder;
+                dracoTempResources[k_BufferPtrIndex] = (IntPtr) buffer;
                 result[0] = 0;
             }
         }
@@ -792,10 +803,10 @@ namespace Draco {
                 if (result[0]<0) {
                     return;
                 }
-                var dracoMeshPtr = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                var dracoMeshPtr = (DracoMesh*) dracoTempResources[k_MeshPtrIndex];
                 var dracoMeshPtrPtr = &dracoMeshPtr;
-                var decoder = (void*) dracoTempResources[decoderPtrIndex];
-                var buffer = (void*) dracoTempResources[bufferPtrIndex];
+                var decoder = (void*) dracoTempResources[k_DecoderPtrIndex];
+                var buffer = (void*) dracoTempResources[k_BufferPtrIndex];
                 var decodeResult = DecodeDracoMeshStep2(dracoMeshPtrPtr, decoder, buffer);
                 result[0] = decodeResult;
             }
@@ -818,7 +829,7 @@ namespace Draco {
                 if (result[0]<0) {
                     return;
                 }
-                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                var dracoMesh = (DracoMesh*) dracoTempResources[k_MeshPtrIndex];
                 if (dracoMesh->isPointCloud) {
                     return;
                 }
@@ -826,13 +837,13 @@ namespace Draco {
                 int indicesLength;
 
                 switch (dataType) {
-                    case DataType.DT_UINT16: {
+                    case DataType.UInt16: {
                         var indices = mesh.GetIndexData<ushort>();
                         indicesPtr = indices.GetUnsafePtr();
                         indicesLength = indices.Length;
                         break;
                     }
-                    case DataType.DT_UINT32: {
+                    case DataType.UInt32: {
                         var indices = mesh.GetIndexData<uint>();
                         indicesPtr = indices.GetUnsafePtr();
                         indicesLength = indices.Length;
@@ -872,7 +883,7 @@ namespace Draco {
                 if (result[0]<0) {
                     return;
                 }
-                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                var dracoMesh = (DracoMesh*) dracoTempResources[k_MeshPtrIndex];
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data, flip, componentStride);
                 var elementSize = DataTypeSize((DataType)data->dataType) * componentStride;
@@ -916,7 +927,7 @@ namespace Draco {
                 if (result[0]<0) {
                     return;
                 }
-                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                var dracoMesh = (DracoMesh*) dracoTempResources[k_MeshPtrIndex];
                 DracoData* data = null;
                 GetAttributeData(dracoMesh, attribute, &data, flip, componentStride);
                 var elementSize = DataTypeSize((DataType)data->dataType) * componentStride;
@@ -959,11 +970,10 @@ namespace Draco {
                 if (result[0]<0) {
                     return;
                 }
-                var dracoMesh = (DracoMesh*) dracoTempResources[meshPtrIndex];
+                var dracoMesh = (DracoMesh*) dracoTempResources[k_MeshPtrIndex];
 
                 DracoData* indicesData = null;
                 GetAttributeData(dracoMesh, indicesAttribute, &indicesData, false, indicesAttribute->numComponents);
-                var indicesDataType = (DataType)indicesData->dataType;
                 var indexSize = DataTypeSize((DataType)indicesData->dataType) * indicesAttribute->numComponents;
                 
                 DracoData* weightsData = null;
@@ -1028,56 +1038,56 @@ namespace Draco {
             public NativeArray<IntPtr> dracoTempResources;
 
             public void Execute() {
-                if (dracoTempResources[meshPtrIndex] != IntPtr.Zero) {
+                if (dracoTempResources[k_MeshPtrIndex] != IntPtr.Zero) {
                     var dracoMeshPtr = (DracoMesh**) dracoTempResources.GetUnsafePtr();
                     ReleaseDracoMesh(dracoMeshPtr);
                 }
-                dracoTempResources[meshPtrIndex]=IntPtr.Zero;
-                dracoTempResources[decoderPtrIndex]=IntPtr.Zero;
-                dracoTempResources[bufferPtrIndex]=IntPtr.Zero;
+                dracoTempResources[k_MeshPtrIndex]=IntPtr.Zero;
+                dracoTempResources[k_DecoderPtrIndex]=IntPtr.Zero;
+                dracoTempResources[k_BufferPtrIndex]=IntPtr.Zero;
             }
         }
       
         static int DataTypeSize(DataType dt) {
             switch (dt) {
-                case DataType.DT_INT8:
-                case DataType.DT_UINT8:
+                case DataType.Int8:
+                case DataType.UInt8:
                     return 1;
-                case DataType.DT_INT16:
-                case DataType.DT_UINT16:
+                case DataType.Int16:
+                case DataType.UInt16:
                     return 2;
-                case DataType.DT_INT32:
-                case DataType.DT_UINT32:
+                case DataType.Int32:
+                case DataType.UInt32:
                     return 4;
-                case DataType.DT_INT64:
-                case DataType.DT_UINT64:
+                case DataType.Int64:
+                case DataType.UInt64:
                     return 8;
-                case DataType.DT_FLOAT32:
+                case DataType.Float32:
                     return 4;
-                case DataType.DT_FLOAT64:
+                case DataType.Float64:
                     return 8;
-                case DataType.DT_BOOL:
+                case DataType.Bool:
                     return 1;
                 default:
                     return -1;
             }
         }
-      
-        VertexAttributeFormat? GetVertexAttributeFormat(DataType inputType, bool normalized = false) {
+
+        static VertexAttributeFormat? GetVertexAttributeFormat(DataType inputType, bool normalized = false) {
             switch (inputType) {
-                case DataType.DT_INT8:
+                case DataType.Int8:
                     return normalized ? VertexAttributeFormat.SNorm8 : VertexAttributeFormat.SInt8;
-                case DataType.DT_UINT8:
+                case DataType.UInt8:
                     return normalized ? VertexAttributeFormat.UNorm8 : VertexAttributeFormat.UInt8;
-                case DataType.DT_INT16:
+                case DataType.Int16:
                     return normalized ? VertexAttributeFormat.SNorm16 : VertexAttributeFormat.SInt16;
-                case DataType.DT_UINT16:
+                case DataType.UInt16:
                     return normalized ? VertexAttributeFormat.UNorm16 : VertexAttributeFormat.UInt16;
-                case DataType.DT_INT32:
+                case DataType.Int32:
                     return VertexAttributeFormat.SInt32;
-                case DataType.DT_UINT32:
+                case DataType.UInt32:
                     return VertexAttributeFormat.UInt32;
-                case DataType.DT_FLOAT32:
+                case DataType.Float32:
                     return VertexAttributeFormat.Float32;
                 // Not supported by Unity
                 // TODO: convert to supported types
@@ -1090,15 +1100,15 @@ namespace Draco {
             }
         }
 
-        VertexAttribute? GetVertexAttribute(AttributeType inputType, int index=0) {
+        static VertexAttribute? GetVertexAttribute(AttributeType inputType, int index=0) {
             switch (inputType) {
-                case AttributeType.POSITION:
+                case AttributeType.Position:
                     return VertexAttribute.Position;
-                case AttributeType.NORMAL:
+                case AttributeType.Normal:
                     return VertexAttribute.Normal;
-                case AttributeType.COLOR:
+                case AttributeType.Color:
                     return VertexAttribute.Color;
-                case AttributeType.TEX_COORD:
+                case AttributeType.TextureCoordinate:
                     Assert.IsTrue(index<8);
                     return (VertexAttribute) ((int)VertexAttribute.TexCoord0+index);
                 default:

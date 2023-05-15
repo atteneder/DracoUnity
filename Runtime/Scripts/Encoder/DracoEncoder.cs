@@ -369,7 +369,7 @@ namespace Draco.Encoder {
                     var indicesData = PinArray(indices, out var gcHandle);
                     dracoEncoderSetIndices(
                         dracoEncoder,
-                        DataType.DT_UINT32,
+                        DataType.UInt32,
                         (uint)indices.Length,
                         true,
                         indicesData
@@ -446,22 +446,22 @@ namespace Draco.Encoder {
             switch (format) {
                 case VertexAttributeFormat.Float32:
                 case VertexAttributeFormat.Float16:
-                    return DataType.DT_FLOAT32;
+                    return DataType.Float32;
                 case VertexAttributeFormat.UNorm8:
                 case VertexAttributeFormat.UInt8:
-                    return DataType.DT_UINT8;
+                    return DataType.UInt8;
                 case VertexAttributeFormat.SNorm8:
                 case VertexAttributeFormat.SInt8:
-                    return DataType.DT_INT8;
+                    return DataType.Int8;
                 case VertexAttributeFormat.UInt16:
                 case VertexAttributeFormat.UNorm16:
-                    return DataType.DT_UINT16;
+                    return DataType.UInt16;
                 case VertexAttributeFormat.SInt16:
                 case VertexAttributeFormat.SNorm16:
-                    return DataType.DT_INT16;
+                    return DataType.Int16;
                 case VertexAttributeFormat.UInt32:
                 case VertexAttributeFormat.SInt32:
-                    return DataType.DT_INT32;
+                    return DataType.Int32;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(format), format, null);
             }
@@ -470,11 +470,11 @@ namespace Draco.Encoder {
         static AttributeType GetAttributeType(VertexAttribute attribute) {
             switch (attribute) {
                 case VertexAttribute.Position:
-                    return AttributeType.POSITION;
+                    return AttributeType.Position;
                 case VertexAttribute.Normal:
-                    return AttributeType.NORMAL;
+                    return AttributeType.Normal;
                 case VertexAttribute.Color:
-                    return AttributeType.COLOR;
+                    return AttributeType.Color;
                 case VertexAttribute.TexCoord0:
                 case VertexAttribute.TexCoord1:
                 case VertexAttribute.TexCoord2:
@@ -483,11 +483,11 @@ namespace Draco.Encoder {
                 case VertexAttribute.TexCoord5:
                 case VertexAttribute.TexCoord6:
                 case VertexAttribute.TexCoord7:
-                    return AttributeType.TEX_COORD;
+                    return AttributeType.TextureCoordinate;
                 case VertexAttribute.Tangent:
                 case VertexAttribute.BlendWeight:
                 case VertexAttribute.BlendIndices:
-                    return AttributeType.GENERIC;
+                    return AttributeType.Generic;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(attribute), attribute, null);
             }
