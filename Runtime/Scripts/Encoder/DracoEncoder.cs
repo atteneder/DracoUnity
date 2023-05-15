@@ -432,11 +432,6 @@ namespace Draco.Encoder {
             return (IntPtr)UnsafeUtility.PinGCArrayAndGetDataAddress(indices, out gcHandle);
         }
 
-        static unsafe void CopyResult(IntPtr dracoEncoder, NativeArray<byte> dracoData)
-        {
-            dracoEncoderCopy(dracoEncoder, dracoData.GetUnsafePtr());
-        }
-
         static unsafe IntPtr[] GetReadOnlyPointers(int count, NativeArray<byte>[] vData)
         {
             var result = new IntPtr[count];
@@ -552,12 +547,6 @@ namespace Draco.Encoder {
         
         [DllImport (DRACOENC_UNITY_LIB)]
         static extern uint dracoEncoderGetEncodedIndexCount(IntPtr encoder);
-        
-        [DllImport (DRACOENC_UNITY_LIB)]
-        static extern ulong dracoEncoderGetByteLength(IntPtr encoder);
-        
-        [DllImport (DRACOENC_UNITY_LIB)]
-        internal static extern unsafe void dracoEncoderCopy(IntPtr encoder, void *data);
         
         [DllImport (DRACOENC_UNITY_LIB)]
         internal static extern unsafe void dracoEncoderGetEncodeBuffer(IntPtr encoder, out void *data, out ulong size);
