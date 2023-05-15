@@ -19,7 +19,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
-using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 namespace Draco {
@@ -29,14 +28,14 @@ namespace Draco {
         /// <summary>
         /// If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).
         /// </summary>
-        bool convertSpace;
+        bool m_ConvertSpace;
 
         /// <summary>
         /// Create a DracoMeshLoader instance which let's you decode Draco data.
         /// </summary>
         /// <param name="convertSpace">If true, coordinate space is converted from right-hand (like in glTF) to left-hand (Unity).</param>
         public DracoMeshLoader(bool convertSpace = true) {
-            this.convertSpace = convertSpace;
+            m_ConvertSpace = convertSpace;
         }
 
         public struct DecodeResult {
@@ -60,21 +59,21 @@ namespace Draco {
         }
         
         public class BoneWeightData : IDisposable {
-            NativeArray<byte> bonesPerVertex;
-            NativeArray<BoneWeight1> boneWeights;
+            NativeArray<byte> m_BonesPerVertex;
+            NativeArray<BoneWeight1> m_BoneWeights;
 
             public BoneWeightData(NativeArray<byte> bonesPerVertex, NativeArray<BoneWeight1> boneWeights) {
-                this.bonesPerVertex = bonesPerVertex;
-                this.boneWeights = boneWeights;
+                m_BonesPerVertex = bonesPerVertex;
+                m_BoneWeights = boneWeights;
             }
 
             public void ApplyOnMesh(Mesh mesh) {
-                mesh.SetBoneWeights(bonesPerVertex,boneWeights);
+                mesh.SetBoneWeights(m_BonesPerVertex,m_BoneWeights);
             }
 
             public void Dispose() {
-                bonesPerVertex.Dispose();
-                boneWeights.Dispose();
+                m_BonesPerVertex.Dispose();
+                m_BoneWeights.Dispose();
             }
         }
 
@@ -281,7 +280,7 @@ namespace Draco {
 #endif
         )
         {
-            var dracoNative = new DracoNative(mesh,convertSpace);
+            var dracoNative = new DracoNative(mesh,m_ConvertSpace);
             var result = new DecodeResult();
 
 #if UNITY_EDITOR

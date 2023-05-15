@@ -84,9 +84,9 @@ namespace Draco.Encoder {
     public static class DracoEncoder {
         
 #if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS
-        const string DRACOENC_UNITY_LIB = "__Internal";
+        const string k_DracoEncUnityLib = "__Internal";
 #elif UNITY_ANDROID || UNITY_STANDALONE || UNITY_WSA || UNITY_EDITOR || PLATFORM_LUMIN
-        const string DRACOENC_UNITY_LIB = "dracoenc_unity";
+        const string k_DracoEncUnityLib = "dracoenc_unity";
 #endif
 
         struct AttributeData {
@@ -524,35 +524,35 @@ namespace Draco.Encoder {
             }
         }
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern IntPtr dracoEncoderCreate(int vertexCount);
         
-        [DllImport(DRACOENC_UNITY_LIB)]
+        [DllImport(k_DracoEncUnityLib)]
         static extern IntPtr dracoEncoderCreatePointCloud(int vertexCount);
 
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         internal static extern void dracoEncoderRelease(IntPtr encoder);
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern void dracoEncoderSetCompressionSpeed(IntPtr encoder, int encodingSpeed, int decodingSpeed);
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern void dracoEncoderSetQuantizationBits(IntPtr encoder, int position, int normal, int uv, int color, int generic);
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         internal static extern bool dracoEncoderEncode(IntPtr encoder, bool preserveTriangleOrder);
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern uint dracoEncoderGetEncodedVertexCount(IntPtr encoder);
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern uint dracoEncoderGetEncodedIndexCount(IntPtr encoder);
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         internal static extern unsafe void dracoEncoderGetEncodeBuffer(IntPtr encoder, out void *data, out ulong size);
 
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern bool dracoEncoderSetIndices(
             IntPtr encoder,
             DataType indexComponentType,
@@ -561,7 +561,7 @@ namespace Draco.Encoder {
             IntPtr indices
             );
         
-        [DllImport (DRACOENC_UNITY_LIB)]
+        [DllImport (k_DracoEncUnityLib)]
         static extern uint dracoEncoderSetAttribute(
             IntPtr encoder,
             int attributeType,
