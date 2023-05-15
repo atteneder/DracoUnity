@@ -42,9 +42,9 @@ namespace Draco {
             }
         }
 
-        public void SetAsset(TextAsset dracoAsset, Bounds bounds) {
-            this.dracoAsset = dracoAsset;
-            this.bounds = bounds;
+        public void SetAsset(TextAsset newDracoAsset, Bounds newBounds) {
+            dracoAsset = newDracoAsset;
+            bounds = newBounds;
         }
         
         public void AddTarget(MeshFilter meshFilter) {
