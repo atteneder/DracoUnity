@@ -27,7 +27,7 @@ namespace Draco.Editor {
     public class DracoImporter : ScriptedImporter {
 
         public override async void OnImportAsset(AssetImportContext ctx) {
-            var dracoData = File.ReadAllBytes(ctx.assetPath);
+            var dracoData = await File.ReadAllBytesAsync(ctx.assetPath);
             var draco = new DracoMeshLoader();
             var mesh = await draco.ConvertDracoMeshToUnity(dracoData, sync: true);
             if (mesh == null) {
