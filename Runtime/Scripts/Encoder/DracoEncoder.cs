@@ -156,12 +156,12 @@ namespace Draco.Encoder {
             int genericQuantization = 12
             )
         {
-
+#if !UNITY_EDITOR
             if (!unityMesh.isReadable) {
                 Debug.LogError("Mesh is not readable");
                 return null;
             }
-            
+#endif
             var positionQuantization = GetIdealQuantization(worldScale, precision, unityMesh.bounds);
 
             return await EncodeMesh(

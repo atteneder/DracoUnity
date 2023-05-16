@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Faster encoding due to avoiding a full memory copy of the result
 - All encoding methods are async now
 - Updated Burst dependency to version 1.8.4
+- Readonly meshes now can be encoded in the Editor
 ### Fixed
 - Destroying temporary copy (instead of original) GameObject when encoding selected GameObject from the menu
 

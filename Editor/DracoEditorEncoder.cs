@@ -140,11 +140,12 @@ namespace Draco.Editor {
             foreach (var meshFilter in meshFilters) {
                 var mesh = meshFilter.sharedMesh;
                 if(mesh==null) continue;
+#if !UNITY_EDITOR
                 if (!mesh.isReadable) {
                     Debug.LogError("Mesh is not readable!");
                     return;
                 }
-                
+#endif
                 var dracoMesh = new DracoMesh(meshFilter, directory);
                 var dracoFilesMissing = !dracoMesh.TryLoadDracoAssets();
 
@@ -220,10 +221,12 @@ namespace Draco.Editor {
 
         static void EncodeMesh(Mesh mesh, string directory) {
             Debug.Log($"Encode mesh {mesh.name} to {directory}");
+#if !UNITY_EDITOR
             if (!mesh.isReadable) {
                 Debug.LogError($"Mesh {mesh.name} is not readable!");
                 return;
             }
+#endif
             var dracoData = AsyncHelpers.RunSync(() => DracoEncoder.EncodeMesh(mesh));
             if (dracoData.Length > 1) {
                 var filename = string.IsNullOrEmpty(mesh.name) ? "Mesh-submesh-{0}.drc.bytes" : $"{mesh.name}-submesh-{{0}}.drc.bytes";
