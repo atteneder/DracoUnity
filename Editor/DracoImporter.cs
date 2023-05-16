@@ -29,7 +29,7 @@ namespace Draco.Editor {
         public override async void OnImportAsset(AssetImportContext ctx) {
             var dracoData = await File.ReadAllBytesAsync(ctx.assetPath);
             var draco = new DracoMeshLoader();
-            var mesh = await draco.ConvertDracoMeshToUnity(dracoData, sync: true);
+            var mesh = await draco.ConvertDracoMeshToUnitySync(dracoData);
             if (mesh == null) {
                 Debug.LogError("Import draco file failed");
                 return;

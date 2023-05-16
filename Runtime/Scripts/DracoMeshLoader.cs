@@ -14,12 +14,15 @@
 //
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
+
+[assembly: InternalsVisibleTo("DracoEditor")]
 
 namespace Draco {
 
@@ -153,41 +156,16 @@ namespace Draco {
             int weightsAttributeId = -1,
             int jointsAttributeId = -1,
             bool forceUnityLayout = false
-#if UNITY_EDITOR
-            ,bool sync = false
-#endif
         )
         {
-            var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
-            var meshDataArray = Mesh.AllocateWritableMeshData(1);
-            var mesh = meshDataArray[0];
-            var result = await ConvertDracoMeshToUnity(
-                mesh,
-                encodedDataPtr,
-                encodedData.Length,
+            return await ConvertByteArray(
+                encodedData,
                 requireNormals,
                 requireTangents,
                 weightsAttributeId,
                 jointsAttributeId,
                 forceUnityLayout
-#if UNITY_EDITOR
-                ,sync
-#endif
             );
-            UnsafeUtility.ReleaseGCObject(gcHandle);
-            if (!result.success) {
-                meshDataArray.Dispose();
-                return null;
-            }
-            var unityMesh = new Mesh();
-            Mesh.ApplyAndDisposeWritableMeshData(meshDataArray,unityMesh,defaultMeshUpdateFlags);
-            if (result.calculateNormals) {
-                unityMesh.RecalculateNormals();
-            }
-            if (requireTangents) {
-                unityMesh.RecalculateTangents();
-            }
-            return unityMesh;
         }
 
         /// <summary>
@@ -245,13 +223,83 @@ namespace Draco {
             int weightsAttributeId = -1,
             int jointsAttributeId = -1,
             bool forceUnityLayout = false
-#if UNITY_EDITOR
-            ,bool sync = false
-#endif
-            )
+        )
         {
             var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
             return await ConvertDracoMeshToUnity(
+                mesh,
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout
+            );
+        }
+        
+#if UNITY_EDITOR
+        internal async Task<DecodeResult> ConvertDracoMeshToUnitySync(
+            Mesh.MeshData mesh,
+            NativeArray<byte> encodedData,
+            bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
+        )
+        {
+            var encodedDataPtr = GetUnsafeReadOnlyIntPtr(encodedData);
+            return await ConvertDracoMeshToUnity(
+                mesh,
+                encodedDataPtr,
+                encodedData.Length,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout,
+                true
+            );
+        }
+
+        internal async Task<Mesh> ConvertDracoMeshToUnitySync(
+            byte[] encodedData,
+            bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
+        )
+        {
+            return await ConvertByteArray(
+                encodedData,
+                requireNormals,
+                requireTangents,
+                weightsAttributeId,
+                jointsAttributeId,
+                forceUnityLayout,
+                true
+            );
+        }
+#endif
+
+        async Task<Mesh> ConvertByteArray(
+            byte[] encodedData,
+            bool requireNormals = false,
+            bool requireTangents = false,
+            int weightsAttributeId = -1,
+            int jointsAttributeId = -1,
+            bool forceUnityLayout = false
+#if UNITY_EDITOR
+            ,bool sync = false
+#endif
+        )
+        {
+            var encodedDataPtr = PinGCArrayAndGetDataAddress(encodedData, out var gcHandle);
+            var meshDataArray = Mesh.AllocateWritableMeshData(1);
+            var mesh = meshDataArray[0];
+            var result = await ConvertDracoMeshToUnity(
                 mesh,
                 encodedDataPtr,
                 encodedData.Length,
@@ -264,7 +312,22 @@ namespace Draco {
                 ,sync
 #endif
             );
+            UnsafeUtility.ReleaseGCObject(gcHandle);
+            if (!result.success) {
+                meshDataArray.Dispose();
+                return null;
+            }
+            var unityMesh = new Mesh();
+            Mesh.ApplyAndDisposeWritableMeshData(meshDataArray,unityMesh,defaultMeshUpdateFlags);
+            if (result.calculateNormals) {
+                unityMesh.RecalculateNormals();
+            }
+            if (requireTangents) {
+                unityMesh.RecalculateTangents();
+            }
+            return unityMesh;
         }
+
 
         async Task<DecodeResult> ConvertDracoMeshToUnity(
             Mesh.MeshData mesh,
