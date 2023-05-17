@@ -23,7 +23,7 @@ using Draco.Encoder;
 
 namespace Draco.Editor {
     
-    public static class DracoEditorEncoder
+    static class DracoEditorEncoder
     {
         const string k_CompressedMeshesDirName = "CompressedMeshes";
 
@@ -70,7 +70,7 @@ namespace Draco.Editor {
         }
 
         [MenuItem("Tools/Draco/Encode Selected GameObject")]
-        public static void Compress() {
+        static void Compress() {
 
             var original = (GameObject)Selection.activeObject;
             if (original == null) {
@@ -93,7 +93,7 @@ namespace Draco.Editor {
         }
 
         [MenuItem("Tools/Draco/Encode Active Scene")]
-        public static void CompressSceneMenu() {
+        static void CompressSceneMenu() {
             CompressScene( SceneManager.GetActiveScene() );
         }
 

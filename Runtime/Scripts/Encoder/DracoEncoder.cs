@@ -29,6 +29,8 @@ namespace Draco.Encoder {
 
     /// <summary>
     /// Contains encoded data and additional meta information.
+    /// The responsibility to dispose this struct and the native resources behind it (via <see cref="Dispose"/>)
+    /// is handed over to the receiver.
     /// </summary>
     public unsafe struct EncodeResult : IDisposable {
 
@@ -47,6 +49,14 @@ namespace Draco.Encoder {
         AtomicSafetyHandle m_SafetyHandle;
 #endif
 
+        /// <summary>
+        /// Constructs an EncodeResult.
+        /// </summary>
+        /// <param name="dracoEncoder">Native Draco encoder instance.</param>
+        /// <param name="indexCount">Number of indices.</param>
+        /// <param name="vertexCount">Number of vertices.</param>
+        /// <param name="vertexAttributes">For each vertex attribute type there's a tuple containing
+        /// the draco identifier and the attribute dimensions (e.g. 3 for 3D positions).</param>
         public EncodeResult(
             IntPtr dracoEncoder,
             uint indexCount,
@@ -81,6 +91,9 @@ namespace Draco.Encoder {
         }
     }
     
+    /// <summary>
+    /// Provides Draco encoding capabilities.
+    /// </summary>
     public static class DracoEncoder {
         
 #if UNITY_EDITOR_OSX || UNITY_WEBGL || UNITY_IOS

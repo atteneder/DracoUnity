@@ -24,7 +24,7 @@ using UnityEditor.Experimental.AssetImporters;
 namespace Draco.Editor {
 
     [ScriptedImporter(1, "drc")]
-    public class DracoImporter : ScriptedImporter {
+    class DracoImporter : ScriptedImporter {
 
         public override async void OnImportAsset(AssetImportContext ctx) {
 #if NET_UNITY_4_8 // Unity 2021 or newer

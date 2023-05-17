@@ -17,7 +17,7 @@ using UnityEngine;
 
 namespace Draco.Editor {
 
-    public static class OnScriptsReloadHandler {
+    static class OnScriptsReloadHandler {
         
         [UnityEditor.Callbacks.DidReloadScripts]
         static void OnScriptsReloaded() {

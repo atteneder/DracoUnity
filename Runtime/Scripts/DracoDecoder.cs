@@ -19,8 +19,14 @@ using UnityEngine;
 
 namespace Draco {
 
+    /// <summary>
+    /// Decodes multiple Draco data and assigns it to <see cref="MeshFilter"/> targets.
+    /// </summary>
     public class DracoDecoder : MonoBehaviour {
 
+        /// <summary>
+        /// Decode instances (one per Draco mesh)
+        /// </summary>
         public DracoDecodeInstance[] instances;
 
         async void Start() {
