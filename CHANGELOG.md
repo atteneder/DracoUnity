@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Editor imports now calculate the correct mesh bounds
 - macOS binaries are now loaded on Apple Silicon properly
 
-## [3.3.2] - 2021-10-27 
+## [3.3.2] - 2021-10-27
 ### Added
 - Error message when users try to run DracoUnity 3.x Unity >=2021.2 combination targeting WebGL
 
