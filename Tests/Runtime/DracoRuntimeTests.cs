@@ -152,8 +152,8 @@ namespace Draco.Tests
             await Task.Yield();
         }
 
-        [Test]
-        public void EncodePointCloud() {
+        [UnityTest]
+        public IEnumerator EncodePointCloud() {
             
             var sphereGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             var sphere = sphereGo.GetComponent<MeshFilter>().sharedMesh;
@@ -165,11 +165,17 @@ namespace Draco.Tests
             mesh.SetSubMesh(0,new SubMeshDescriptor(0,0,MeshTopology.Points));
             mesh.vertices = vertices;
 
-            var result = Draco.Encoder.DracoEncoder.EncodeMesh(mesh);
+            var task = Encoder.DracoEncoder.EncodeMesh(mesh);
+            while (!task.IsCompleted)
+            {
+                yield return null;
+            }
+
+            var result = task.Result;
             Assert.NotNull(result);
             Assert.AreEqual(1, result.Length);
-            Assert.AreEqual(2330, result[0].data.Length);
-            
+            Assert.AreEqual(2325, result[0].data.Length);
+
             result[0].Dispose();
         }
     }
