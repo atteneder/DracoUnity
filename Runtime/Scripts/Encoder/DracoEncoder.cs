@@ -346,7 +346,10 @@ namespace Draco.Encoder {
 
                 var attributeIds = new Dictionary<VertexAttribute,(uint identifier,int dimensions)>();
 
-                foreach (var (attribute, attrData) in attributeDataDict) {
+                foreach (var attributeTuple in attributeDataDict)
+                {
+                    var attribute = attributeTuple.Key;
+                    var attrData = attributeTuple.Value;
                     var format = mesh.GetVertexAttributeFormat(attribute);
                     var dimension = mesh.GetVertexAttributeDimension(attribute);
                     var stride = strides[attrData.stream];

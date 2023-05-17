@@ -27,7 +27,11 @@ namespace Draco.Editor {
     public class DracoImporter : ScriptedImporter {
 
         public override async void OnImportAsset(AssetImportContext ctx) {
+#if NET_UNITY_4_8 // Unity 2021 or newer
             var dracoData = await File.ReadAllBytesAsync(ctx.assetPath);
+#else
+            var dracoData = File.ReadAllBytes(ctx.assetPath);
+#endif
             var draco = new DracoMeshLoader();
             var mesh = await draco.ConvertDracoMeshToUnitySync(dracoData);
             if (mesh == null) {
